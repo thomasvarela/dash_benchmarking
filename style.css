@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto&display=swap');
+
+html, body, h3, [class*="css"]  {
+   font-family: 'Roboto';
+   font-weight:300;
+}
+
+.nav-item{
+   font-family: "Roboto";
+   font-weight: 300;
+   font-size: 1rem;
+   line-height: 1.4375em;
+   letter-spacing: 0.00938em;
+}
+
+p, button{
+   font-family: "Roboto";
+   font-weight: 300;
+   font-size: 1rem;
+   line-height: 1.5;
+   letter-spacing: 0.00938em;
+}
+
+.css-1mzk3hg{
+   border: 1px solid;
+   font-weight:300;
+   letter-spacing: 0.02857em;
+   font-size: 0.875rem;
+   display: inline-flex;
+   padding: 10px;
+   text-transform:uppercase;
+   text-align:center;
+}
+
+div[data-baseweb="select"] {
+   font-family: "Roboto";
+   font-weight: 300;
+   font-size: 1rem;
+   line-height: 1.4375em;
+   letter-spacing: 0.00938em;
+   box-sizing: border-box;
+   cursor: text;
+   display: inline-flex;
+   -moz-box-align: center;
+   align-items: center;
+   width: 100%;
+   position: relative;
+   border-radius: 10px;
+   padding-right: 14px;
+}
+
+.css-u9fsbs {
+   font-weight: 300;
+}
+
+
+div[data-testid="stForm"]{
+   font-family: 'Roboto', sans-serif;
+}
+div[aria-labelledby="Emails para notificaciones"]{
+   font-family: 'Roboto', sans-serif;
+}
+
+
+
+.st-bt {
+   font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+   font-weight: 300;
+   font-size: 1rem;
+   line-height: 1.4375em;
+   letter-spacing: 0.00938em;
+   border-radius: 10px;
+}
+.st-bs {
+   font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+   font-weight: 300;
+   font-size: 1rem;
+   line-height: 1.4375em;
+   letter-spacing: 0.00938em;
+   border-radius: 10px;
+
+}
+div.css-6qob1r.e1fqkh3o3{
+   border: 20px;
+}
+div.css-880vk7{
+   border: 0px;
+   margin-top: 10px;
+}
+div.css-163ttbj {
+   width:800px;
+}
+
+div.css-6qob1r.e1fqkh3o3 {
+   border-right:1px solid;
+
+}
+.css-1vq4p4l {
+   padding: 5rem 0rem 0rem;
+}
+
+.mui-style-1b26ald {
+   box-shadow: none;
+   display: flex;
+   flex-direction: column;
+   box-sizing: border-box;
+   flex-shrink: 0;
+   position: fixed;
+   top: 0px;
+   left: auto;
+   right: 0px;
+   color: inherit;
+   z-index: 1201;
+   transition: width 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, margin 225ms cubic-bezier(0.4, 0, 0.6, 1) 0ms;
+   margin-left: 260px;
+   width: calc(100% - 260px);
+   border-bottom: 1px solid;
+ }
+
+ .nav-link active{
+   font-family: 'Roboto';
+   border-radius: 10px;
+   font-weight:300;
+}
+
+.css-lxm6e2 {
+   display: inline-block;
+}
+.css-1omrp78 {
+      margin-top: -20px;
+}
+
+.css-9ycgxx::after {
+   content: " / Arrastra y suelta el archivo aquí";
+}
+.css-63tu5r::after{
+   content: " / Límite de 5GB por archivo";
+}
+
+.st-emotion-cache-sy3zga {
+   font-family: 'Roboto';
+   border-radius: 10px;
+   font-weight:300;
+}
+
+
+.st-emotion-cache-br2g7n {
+   font-family: 'Roboto';
+   font-size: 1rem;
+}
+
+.st-emotion-cache-9gvukl {
+   font-family: 'Roboto';
+   font-size: 1rem;
+}
+
+button[title="View fullscreen"]{
+   visibility: hidden;}
