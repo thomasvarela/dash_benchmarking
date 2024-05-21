@@ -69,6 +69,42 @@ def api_call_logo(user_info, url, access_key_id, default_logo='assets/GeoAgro_pr
     except: 
         return Image.open(default_logo)
 
+#############################
+# API CALL FIELDS TABLE 
+#############################
+
+import requests
+import pandas as pd
+
+def api_call_fields_table(user_info, access_key_id, url):
+    #url = 'https://lpul7iylefbdlepxbtbovin4zy.appsync-api.us-west-2.amazonaws.com/graphql'
+    headers = {
+        'x-api-key': access_key_id,
+        'Content-Type': 'application/json'
+    }
+    query = f'''
+    query MyQuery {{
+      get_field_table(domainId: {user_info['domainId']}, email: "{user_info['email']}", exportAllAsCsv: true, lang: "{user_info['language']}", withHectares: true, withCentroid: true, withGeom: true, delimiter: "@") {{
+        csvUrl
+      }}
+    }}
+    '''
+    response = requests.post(url, json={'query': query}, headers=headers)
+
+    if response.status_code != 200:
+        return None
+    else:
+        data = response.json()
+        csv_url = data['data']['get_field_table']['csvUrl']
+
+        df = pd.read_csv(csv_url, delimiter="@")
+        # Eliminar filas donde 'hectares' es NaN
+        df = df.dropna(subset=['hectares'])
+
+        # Eliminar filas donde 'hectares' es igual a 0
+        df = df[df['hectares'] != 0]
+
+        return data, df
 
 #############################
 # DECRYPT 
@@ -106,3 +142,28 @@ def decrypt_token(token_string: str) -> dict:
     
     return json.loads(str(decrypted, 'utf-8'))
 
+#############################
+# API CALL DOMAIN BY USER 
+#############################
+
+import requests
+
+def domains_areas_by_user(user_email, access_key_id, url):
+    headers = {
+        'x-api-key': access_key_id,
+        'Content-Type': 'application/json'
+    }
+    query = f'''
+    query MyQuery {{
+      domains_areas_by_user(email: "{user_email}") {{
+        id
+        name
+      }}
+    }}
+    '''
+    response = requests.post(url, json={'query': query}, headers=headers)
+    if response.status_code != 200:
+        return None
+    else:
+        data = response.json()
+        return data['data']['domains_areas_by_user']

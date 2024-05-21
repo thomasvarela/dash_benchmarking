@@ -46,6 +46,7 @@ translate_dict = {
     'select_all': {'en': 'Select all', 'es': 'Seleccionar todo', 'pt': 'Selecionar tudo'}, 
     'select_date_range': {'en': 'Select Date Range:', 'es': 'Seleccionar Rango de Fechas:', 'pt': 'Selecionar Intervalo de Datas:'}, 
     'select_grouping_field': {'en': 'Select a grouping field:', 'es': 'Seleccione un campo de agrupamiento:', 'pt': 'Selecione um campo de agrupamento:'}, 
+    'select_fields': {'en': 'Selected Fields', 'es': 'Lotes Seleccionados', 'pt': 'Lotes Selecionados'},
     'select_warning': {'en': 'You must select a field to continue', 'es': 'Debe seleccionar un lote para continuar', 'pt': 'Você deve selecionar um campo para continuar'}, 
     'title': {'en': 'Fields and Crops Dashboard', 'es': 'Tablero de Lotes y Cultivos', 'pt': 'Painel de Campos e Cultivos'}, 
     'title_yield': {"en": "Yield Dashboard", "es": "Tablero de Rindes", "pt": "Painel de Rendimento"}, 
@@ -70,4 +71,5 @@ translate_dict = {
                                     'es': '',
                                     'pt': ''
                                     },
+    'map_select_fields': {'en': 'Map of Selected FIelds', 'es': 'Mapa de Lotes Seleccionados', 'pt': 'Mapa dos Lotes Selecionados'}                              
     }
