@@ -71,5 +71,7 @@ translate_dict = {
                                     'es': '',
                                     'pt': ''
                                     },
-    'map_select_fields': {'en': 'Map of Selected FIelds', 'es': 'Mapa de Lotes Seleccionados', 'pt': 'Mapa dos Lotes Selecionados'}                              
+    'map_select_fields': {'en': 'Map of Selected FIelds', 'es': 'Mapa de Lotes Seleccionados', 'pt': 'Mapa dos Lotes Selecionados'},
+    'selected_date_range': {'en': 'Selected Date Range:', 'es': 'Rango de Fechas Seleccionado:', 'pt': 'Intervalo de Datas Seleccionado:'},
+    'date': {'en': 'Date:', 'es': 'Fecha:', 'pt': 'Data:'}                             
     }

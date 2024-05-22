@@ -2,45 +2,12 @@ import ee
 import pandas as pd
 from datetime import datetime
 
-# # Leer el DataFrame
-# filtered_df = pd.read_csv('filtered_df.csv')
-
-# # Convertir las columnas de fecha a datetime
-# filtered_df['start_date'] = pd.to_datetime(filtered_df['start_date'])
-# filtered_df['end_date'] = pd.to_datetime(filtered_df['end_date'])
-
-# # Inicializar las fechas
-# fecha_de_inicio = filtered_df['start_date']
-# fecha_de_finalizacion = filtered_df['end_date']
-
-# # Convertir las fechas al formato correcto
-# START_DATE = fecha_de_inicio.dt.strftime('%Y-%m-%d')
-# END_DATE = fecha_de_finalizacion.dt.strftime('%Y-%m-%d')
-
-# # Asegúrate de que sean strings, no series
-# START_DATE = START_DATE.iloc[0]
-# END_DATE = END_DATE.iloc[0]
-
 CLOUD_FILTER = 60
 CLD_PRB_THRESH = 40
 NIR_DRK_THRESH = 0.15
 CLD_PRJ_DIST = 2
 BUFFER = 100
 
-# filtered_df = pd.read_csv('filtered_df.csv')
-
-# # Inicializar las fechas
-# fecha_de_inicio = filtered_df['start_date']
-# fecha_de_finalizacion = filtered_df['end_date']
-
-# # Convertir las fechas al formato correcto
-# START_DATE = fecha_de_inicio.strftime('%Y-%m-%d')
-# END_DATE = fecha_de_finalizacion.strftime('%Y-%m-%d')
-# CLOUD_FILTER = 60
-# CLD_PRB_THRESH = 40
-# NIR_DRK_THRESH = 0.15
-# CLD_PRJ_DIST = 2
-# BUFFER = 100
 
 ################################################################################
 # Filtro de nubes

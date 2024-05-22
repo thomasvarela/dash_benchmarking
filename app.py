@@ -11,9 +11,12 @@ from PIL import Image
 
 # Integración web y aplicaciones interactivas
 import streamlit as st
+from streamlit_extras.metric_cards import style_metric_cards
+from streamlit_extras.mandatory_date_range import date_range_picker
 import streamlit_google_oauth as oauth
 from streamlit_vertical_slider import vertical_slider
 import plotly.graph_objects as go
+import plotly.express as px
 
 # Manejo de geometrías
 from shapely.geometry import shape, mapping, Point
@@ -311,14 +314,75 @@ def main_app(user_info):
                     hibrido,
                     placeholder=translate("choose_option", lang))
                 
-            # Filtra el DataFrame basado en las áreas seleccionadas
+            # # Filtra el DataFrame basado en las áreas seleccionadas
+            # filtered_df = filtered_df[filtered_df['hybrid'].isin(selector_hibrido)]
+
+            # filtered_df.reset_index(drop=True, inplace=True)
+            # filtered_df.index += 1
+
+            # filtered_df.to_csv('filtered_df.csv', index=False)
+            
+            ############################################################################
+            # Field
+            ############################################################################
+
+            # Filtra el DataFrame basado en los híbridos seleccionados
             filtered_df = filtered_df[filtered_df['hybrid'].isin(selector_hibrido)]
 
+            # Obtén los nombres de los fields únicos del DataFrame filtrado
+            fields = sorted(filtered_df['field_name'].unique().tolist())
+
+            container = st.container()
+            select_all_fields = st.toggle(translate("select_all", lang), value=True, key='select_all_fields')
+
+            if select_all_fields:
+                selector_fields = container.multiselect(
+                    translate("field", lang),
+                    fields,
+                    fields)  # Todos los fields están seleccionados por defecto
+            else:
+            # Establecer default_field_name basado en los híbridos seleccionados
+                default_field_name = filtered_df.loc[filtered_df['hybrid'].isin(selector_hibrido), 'field_name'].unique().tolist()
+                selector_fields = container.multiselect(
+                    translate("field", lang),
+                    fields,
+                    default=default_field_name,
+                    placeholder=translate("choose_option", lang))
+
+            # Filtra el DataFrame basado en los fields seleccionados
+            filtered_df = filtered_df[filtered_df['field_name'].isin(selector_fields)]
+
+            # Reinicia el índice del DataFrame filtrado
             filtered_df.reset_index(drop=True, inplace=True)
             filtered_df.index += 1
-
-            filtered_df.to_csv('filtered_df.csv', index=False)
+            ###########################################################################
+            #Fecha
+            ###########################################################################
             
+            # Asegúrate de que start y end date está en formato datetime
+            filtered_df['start_date'] = pd.to_datetime(filtered_df['start_date'], errors='coerce')
+            filtered_df['end_date'] = pd.to_datetime(filtered_df['end_date'], errors='coerce')
+
+            # Determinar el rango de fechas disponible
+            min_date = filtered_df['start_date'].min()
+            max_date = filtered_df['end_date'].max()
+
+                        
+            # Muestra el selector de rango de fechas
+            
+            selected_date_range = date_range_picker(translate("select_date_range", lang),
+                                                    default_start=min_date.date() if min_date else None,
+                                                    default_end=max_date.date() if max_date else None, 
+                                                    min_date=min_date.date() if min_date else None, 
+                                                    max_date=max_date.date() if max_date else None,
+                                                    error_message=translate("error_message_date_picker", lang) 
+                                                    )
+            
+           # Asignar las fechas seleccionadas a todas las filas de las columnas START_DATE y END_DATE
+            filtered_df = filtered_df.assign(
+                START_DATE=selected_date_range[0],
+                END_DATE=selected_date_range[1]
+            )
             ############################################################################
             # Powered by GeoAgro Picture
             ############################################################################
@@ -391,10 +455,12 @@ def main_app(user_info):
                 len(filtered_df['hybrid'].unique())
             )
 
-             # Agregar las métricas
+            # Agregar las métricas
             col1, col2, col3, col4, col5 = st.columns(5)
-        ############################################################################
+
+            style_metric_cards(border_left_color="#0e112c", box_shadow=False)
         
+        ############################################################################
         st.divider()  # 👈 Draws a horizontal rule
         st.markdown('')
         st.markdown(f"<b>{translate('select_fields', lang)}</b>", unsafe_allow_html=True)
@@ -414,6 +480,8 @@ def main_app(user_info):
                         "centroid": None,
                         "start_date": None,
                         "end_date": None,
+                        "START_DATE": None,
+                        "END_DATE": None,
                         "area_name": translate('area', lang), #Traducir a paritir del diccionario
                         "workspace_name": translate('workspace', lang),
                         "season_name": translate('season', lang),
@@ -478,7 +546,7 @@ def main_app(user_info):
         # Columnas a excluir
         columns_to_exclude = [
             'area_id', 'workspace_id', 'season_id', 'farm_id',
-            'field_id', 'geom', 'centroid', 'start_date', 'end_date'
+            'field_id', 'geom', 'centroid', 'start_date', 'end_date','START_DATE','END_DATE'
         ]
         gdf.drop(columns=columns_to_exclude, inplace=True, errors='ignore')
 
@@ -507,6 +575,11 @@ def main_app(user_info):
 
         Map.to_streamlit()
 
+        ############################################################################
+        
+        st.divider()
+        st.markdown('')
+        
         ############################################################################
         # NDVI
         ############################################################################
@@ -538,88 +611,119 @@ def main_app(user_info):
         #     # Opcionalmente, puedes resetear el índice si prefieres que la fecha sea una columna regular en lugar de el índice del DataFrame
         #     pivot_df.reset_index(inplace=True)
 
+        # Convertir las columnas de fecha a datetime
+        filtered_df['START_DATE'] = pd.to_datetime(filtered_df['START_DATE'])
+        filtered_df['END_DATE'] = pd.to_datetime(filtered_df['END_DATE'])
+
+        # Inicializar las fechas
+        fecha_de_inicio = filtered_df['START_DATE']
+        fecha_de_finalizacion = filtered_df['END_DATE']
+
+        # Convertir las fechas al formato correcto
+        START_DATE = fecha_de_inicio.dt.strftime('%Y-%m-%d')
+        END_DATE = fecha_de_finalizacion.dt.strftime('%Y-%m-%d')
+
+        # for index, row in filtered_df.iterrows():
+        # # Extraer la geometría individual
+        #     try:
+        #         lote_gdf_filtrado = filtered_df.iloc[[index]]
+        #         print(f"Procesando el índice: {index}")
+        #         # Llamar a la función con la geometría actual
+        #         df_temp = extract_mean_ndvi_date(lote_gdf_filtrado,row[START_DATE],row[END_DATE])
+        #         if df_temp.empty:
+        #             print(f"No se encontraron datos NDVI para el índice: {index}")
+        #             continue
+        # Procesar cada fila en el DataFrame filtrado
+    # Procesar cada fila en el DataFrame filtrado
         for index, row in filtered_df.iterrows():
-        # Extraer la geometría individual
             try:
-                lote_gdf_filtrado = filtered_df.iloc[[index]]
+                # Extraer la geometría individual y asegurar que es un DataFrame
+                lote_gdf_filtrado = pd.DataFrame([row])
+                
+                # Verificar que contiene geometría
+                if 'geometry' not in lote_gdf_filtrado.columns or lote_gdf_filtrado['geometry'].iloc[0] is None:
+                    print(f"Error: No se encontró geometría en lote_gdf_filtrado en el índice {index}")
+                    continue
+
                 print(f"Procesando el índice: {index}")
+
                 # Llamar a la función con la geometría actual
-                df_temp = extract_mean_ndvi_date(lote_gdf_filtrado)
+                df_temp = extract_mean_ndvi_date(lote_gdf_filtrado, row['START_DATE'].strftime('%Y-%m-%d'), row['END_DATE'].strftime('%Y-%m-%d'))
                 if df_temp.empty:
                     print(f"No se encontraron datos NDVI para el índice: {index}")
                     continue
-                
+
                 # Obtener el nombre de la geometría
                 geom_name = row["field_name"]
-                
+
                 # Agregar el nombre de la geometría como columna
                 df_temp["Lote"] = geom_name
-                
+
                 # Agregar el DataFrame temporal al DataFrame final
                 final_df = pd.concat([final_df, df_temp], ignore_index=True)
             except Exception as e:
                 print(f"Error procesando el índice {index}: {e}")
                 continue
 
+        # Verificar si el DataFrame final está vacío
         if final_df.empty:
             st.error("No se encontraron datos NDVI para ninguna geometría.")
-            return
+        else:
+            # Crear una tabla pivot con 'Date' como índice, 'Lote' como columnas y 'Mean_NDVI' como valores
+            pivot_df = final_df.pivot_table(index='Date', columns='Lote', values='Mean_NDVI')
+            pivot_df.reset_index(inplace=True)
 
-        pivot_df = final_df.pivot_table(index='Date', columns='Lote', values='Mean_NDVI')
+            # Convertir la columna 'Date' a datetime
+            pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
 
-        # Opcionalmente, puedes resetear el índice si prefieres que la fecha sea una columna regular en lugar de el índice del DataFrame
-        pivot_df.reset_index(inplace=True)
+            # Convertir fechas a un formato numérico (número de días desde la primera fecha)
+            pivot_df['DateNum'] = (pivot_df['Date'] - pivot_df['Date'].min()) / np.timedelta64(1, 'D')
 
-        # Mostrar el DataFrame final
-        st.dataframe(pivot_df)
+            # Preparar un nuevo DataFrame para almacenar resultados interpolados
+            interpolated_df = pd.DataFrame()
+            interpolated_df['Date'] = pivot_df['Date']
 
-        import plotly.express as px
+            # Interpolar valores faltantes para cada lote usando RBFInterpolator
+            for column in pivot_df.columns:
+                if column not in ['Date', 'DateNum']:
+                    # Filtrar valores nulos y preparar datos para la interpolación
+                    x = pivot_df.loc[pivot_df[column].notna(), 'DateNum']
+                    y = pivot_df.loc[pivot_df[column].notna(), column]
 
-        # Convertir la columna 'Date' a datetime si aún no lo es
-        pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
+                    if x.empty or y.empty:
+                        print(f"No hay datos para interpolar en la columna: {column}")
+                        continue
 
-        # Convertir las fechas a un formato numérico (por ejemplo, el número de días desde la primera fecha)
-        pivot_df['DateNum'] = (pivot_df['Date'] - pivot_df['Date'].min()) / np.timedelta64(1, 'D')
+                    # Crear el interpolador RBF
+                    rbf = RBFInterpolator(x.values[:, None], y.values, kernel='thin_plate_spline')
 
-        # Preparar un nuevo DataFrame para almacenar los resultados interpolados
-        interpolated_df = pd.DataFrame()
-        interpolated_df['Date'] = pivot_df['Date']
+                    # Interpolar valores para todas las fechas
+                    y_interp = rbf(pivot_df['DateNum'].values[:, None])
 
-        for column in pivot_df.columns:
-            if column not in ['Date', 'DateNum']:
-                # Filtrar los valores nulos y preparar los datos para la interpolación
-                x = pivot_df.loc[pivot_df[column].notna(), 'DateNum']
-                y = pivot_df.loc[pivot_df[column].notna(), column]
-                
-                # Crear el interpolador RBF
-                rbf = RBFInterpolator(x[:, None], y, kernel='thin_plate_spline')  # Puedes experimentar con diferentes kernels
-                
-                # Interpolar los valores para todas las fechas
-                y_interp = rbf(pivot_df['DateNum'][:, None])
-                
-                # Almacenar los resultados en el DataFrame
-                interpolated_df[column] = y_interp
+                    # Almacenar resultados interpolados en el DataFrame
+                    interpolated_df[column] = y_interp
+            
+            # Mostrar la tabla con los datos finales
+            st.write("Datos NDVI interpolados por lote:")
+            st.dataframe(pivot_df,
+                        column_config={"DateNum":None},
+                        width=100000)
+            
+            # Crear un gráfico de líneas usando Plotly Express
+            fig = px.line(interpolated_df, x='Date', y=interpolated_df.columns[1:], title='NDVI Interpolado por Lotes')
+            st.plotly_chart(fig)
 
-        # Usar Plotly Express para crear el gráfico de líneas
-        fig = px.line(interpolated_df, x='Date', y=interpolated_df.columns[1:], markers=True)
-
-        # Actualizar layout del gráfico
-        fig.update_layout(
-            title='NDVI medio por lote a lo largo del tiempo',
-            xaxis_title='Fecha',
-            yaxis_title='NDVI medio',
-            legend_title='Lote'
-        )
-
-        # Asumiendo el uso de Streamlit para mostrar el gráfico
-        st.plotly_chart(fig, use_container_width=True)
+            ############################################################################
+        
+        st.divider()
+        st.markdown('')
 
         ############################################################################
         st.caption("Powered by GeoAgro")
 
 if __name__ == "__main__":
     redirect_uri=" http://localhost:8501"
-    user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'prod', 'domainId': 1, 'areaId': 9750, 'workspaceId': 175, 'seasonId': 3595, 'farmId': 181}     
+    user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'test', 'domainId': 1, 'areaId': 1, 'workspaceId': 882, 'seasonId': 172, 'farmId': 2277} # TEST / GeoAgro / GeoAgro / TEST_BONELLI / 2021-22 / Bellamar - Bellamar 
     st.session_state['user_info'] = user_info
     main_app(user_info)
 
