@@ -589,52 +589,10 @@ def main_app(user_info):
         # DataFrame final que almacenará los resultados
         final_df = pd.DataFrame()
 
-        # for index, row in filtered_df.iterrows():
-        #     # Extraer la geometría individual
-        #     lote_gdf_filtrado = filtered_df.iloc[[index]]
-            
-        #     # Llamar a la función con la geometría actual
-        #     df_temp = extract_mean_ndvi_date(lote_gdf_filtrado,START_DATE,END_DATE)
-            
-        #     # Obtener el nombre de la geometría
-        #     geom_name = row[]
-            
-        #     # Agregar el nombre de la geometría como columna
-        #     df_temp[translate("field", lang)] = geom_name
-            
-        #     # Agregar el DataFrame temporal al DataFrame final
-        #     final_df = pd.concat([final_df, df_temp], ignore_index=True)
-
-        #     # Asumiendo que tu DataFrame se llama df
-        #     pivot_df = final_df.pivot_table(index='Date', columns='Lote', values='Mean_NDVI')
-
-        #     # Opcionalmente, puedes resetear el índice si prefieres que la fecha sea una columna regular en lugar de el índice del DataFrame
-        #     pivot_df.reset_index(inplace=True)
-
         # Convertir las columnas de fecha a datetime
         filtered_df['START_DATE'] = pd.to_datetime(filtered_df['START_DATE'])
         filtered_df['END_DATE'] = pd.to_datetime(filtered_df['END_DATE'])
 
-        # Inicializar las fechas
-        fecha_de_inicio = filtered_df['START_DATE']
-        fecha_de_finalizacion = filtered_df['END_DATE']
-
-        # Convertir las fechas al formato correcto
-        START_DATE = fecha_de_inicio.dt.strftime('%Y-%m-%d')
-        END_DATE = fecha_de_finalizacion.dt.strftime('%Y-%m-%d')
-
-        # for index, row in filtered_df.iterrows():
-        # # Extraer la geometría individual
-        #     try:
-        #         lote_gdf_filtrado = filtered_df.iloc[[index]]
-        #         print(f"Procesando el índice: {index}")
-        #         # Llamar a la función con la geometría actual
-        #         df_temp = extract_mean_ndvi_date(lote_gdf_filtrado,row[START_DATE],row[END_DATE])
-        #         if df_temp.empty:
-        #             print(f"No se encontraron datos NDVI para el índice: {index}")
-        #             continue
-        # Procesar cada fila en el DataFrame filtrado
-    # Procesar cada fila en el DataFrame filtrado
         for index, row in filtered_df.iterrows():
             try:
                 # Extraer la geometría individual y asegurar que es un DataFrame
@@ -711,8 +669,90 @@ def main_app(user_info):
             
             # Crear un gráfico de líneas usando Plotly Express
             fig = px.line(interpolated_df, x='Date', y=interpolated_df.columns[1:], title='NDVI Interpolado por Lotes')
+            # Personalizar el diseño
+            fig.update_layout(width = 1400, height = 500, autosize = False)
+            
             st.plotly_chart(fig)
 
+            #HEATMAP
+
+            # Definir la paleta de colores personalizada basada en la imagen proporcionada
+            custom_colorscale = [
+                [0.0, 'rgb(0, 0, 4)'],        # Negro
+                [0.05, 'rgb(103, 0, 31)'],    # Rojo oscuro
+                [0.1, 'rgb(178, 24, 43)'],    # Rojo claro
+                [0.2, 'rgb(214, 96, 77)'],    # Marrón claro
+                [0.25, 'rgb(244, 165, 130)'], # Beige
+                [0.3, 'rgb(171, 221, 164)'],  # Verde claro
+                [0.55, 'rgb(90, 174, 97)'],   # Verde medio
+                [0.7, 'rgb(0, 100, 0)'],      # Verde oscuro
+                [0.8, 'rgb(43, 131, 186)'],   # Azul claro
+                [0.9, 'rgb(5, 113, 176)'],    # Azul medio
+                [1.0, 'rgb(4, 19, 100)']      # Azul oscuro
+            ]
+
+            # Obtener los valores de las columnas de lotes (excluyendo la columna 'Date')
+            lotes_values = interpolated_df.drop(columns='Date').values
+
+            # Obtener las fechas
+            fechas = interpolated_df['Date'].values
+
+            # Crear una matriz z con ceros, con filas para cada lote y columnas para cada fecha
+            z = np.zeros((len(lotes_values), len(fechas)))
+
+            # Llenar la matriz z con los valores interpolados
+            for i, lotes_value in enumerate(lotes_values.T):
+                z[i, :] = lotes_value
+
+            # Crear el heatmap
+            fig = go.Figure(data=go.Heatmap(
+                z=z,
+                x=fechas,
+                y=interpolated_df.columns[1:],  # Columnas de lotes
+                colorscale=custom_colorscale ))
+
+            # Personalizar el diseño
+            fig.update_layout(
+                title='Interpolated NDVI Heatmap',
+                xaxis_title='Date',
+                yaxis_title='Lote',
+                width = 1400, 
+                height = 500,
+                autosize = False)
+
+            # Mostrar el heatmap
+            st.plotly_chart(fig)
+
+            #BOXPLOT # Crear un boxplot para cada columna (lote) en interpolated_df
+            
+            # Crear el boxplot horizontal
+            fig = go.Figure()
+
+            # Iterar sobre las columnas de 'interpolated_df' excepto la columna 'Date'
+            for column in interpolated_df.columns[1:]:  # Saltar la columna 'Date'
+                fig.add_trace(go.Box(
+                    x=interpolated_df[column],
+                    name=column,
+                    boxmean=False  # Mostrar la media y desviación estándar
+                ))
+
+            # Ajustar el layout del gráfico
+            fig.update_layout(
+                title="Boxplot Horizontal de NDVI Interpolado por Lote",
+                xaxis_title="NDVI",
+                yaxis_title="Lote",
+                boxmode='group', width = 1400, 
+                height = 500,
+                autosize = False
+            )
+
+            st.plotly_chart(fig)
+
+            ############################################################################
+            #Ranking
+            ############################################################################
+
+          
             ############################################################################
         
         st.divider()
