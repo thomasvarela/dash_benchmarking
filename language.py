@@ -73,5 +73,17 @@ translate_dict = {
                                     },
     'map_select_fields': {'en': 'Map of Selected FIelds', 'es': 'Mapa de Lotes Seleccionados', 'pt': 'Mapa dos Lotes Selecionados'},
     'selected_date_range': {'en': 'Selected Date Range:', 'es': 'Rango de Fechas Seleccionado:', 'pt': 'Intervalo de Datas Seleccionado:'},
-    'date': {'en': 'Date:', 'es': 'Fecha:', 'pt': 'Data:'}                             
+    'date': {'en': 'Date:', 'es': 'Fecha:', 'pt': 'Data:'}, 
+    'date2': {'en': 'Date', 'es': 'Fecha', 'pt': 'Data'},
+    'ndvi_results': {'en': 'Interpolated NDVI Results', 'es': 'Resultados de NDVI Interpolado', 'pt': 'Resultados NDVI Interpolado'},
+    'ndvi_date': {'en': 'NDVI Data by Date', 'es': 'Datos NDVI por Fecha', 'pt': 'Dados NDVI por Data'},
+    'ndvi_serie': {'en': 'NDVI Time Series', 'es': 'Serie Temporal NDVI', 'pt': 'Série Temporal do NDVI'},
+    'ndvi_heatmap': {'en': 'Interpolated NDVI Heatmap', 'es': 'Heatmap de NDVI Interpolado', 'pt': 'Heatmap NDVI Interpolado'},
+    'ndvi_boxplot': {'en': 'Interpolated NDVI BOXPLOT', 'es': 'Boxplot de NDVI Interpolado', 'pt': 'Boxplot NDVI Interpolado'},
+    'median': {'en': 'Median', 'es': 'Mediana', 'pt': 'Mediana'},
+    'ndvi_integral': {'en': 'NDVI Integral', 'es': 'Integral de NDVI', 'pt': 'Integral de NDVI'},
+    'ndvi_sd': {'en': 'NDVI Standard Deviation', 'es': 'Desvío Estándar de NDVI', 'pt': 'Desvio Padrão do NDVI'},
+    'ndvi_sd_rank': {'en': 'NDVI Standard Deviation Ranking', 'es': 'Ranking por Desvío Estándar de NDVI', 'pt': 'Classificação de Desvio Padrão do NDVI'},
+    'ndvi_integral_rank': {'en': 'NDVI Integral Ranking', 'es': 'Ranking por Integral de NDVI', 'pt': 'Classificação de Integral do NDVI'},
+    'average': {'en': 'Average', 'es': 'Promedio', 'pt': 'Média'}                                   
     }

@@ -111,6 +111,7 @@ def extract_mean_ndvi_date(lote_gdf_filtrado,START_DATE,END_DATE):
     s2_sr_cld_col = (s2_sr_cld_col.map(add_cld_shdw_mask)
                                     .map(apply_cld_shdw_mask)
                                     .map(add_ndvi))
+    
 
     def compute_mean(image):
         mean_value = image.reduceRegion(
