@@ -48,7 +48,7 @@ translate_dict = {
     'select_grouping_field': {'en': 'Select a grouping field:', 'es': 'Seleccione un campo de agrupamiento:', 'pt': 'Selecione um campo de agrupamento:'}, 
     'select_fields': {'en': 'Selected Fields', 'es': 'Lotes Seleccionados', 'pt': 'Lotes Selecionados'},
     'select_warning': {'en': 'You must select a field to continue', 'es': 'Debe seleccionar un lote para continuar', 'pt': 'Você deve selecionar um campo para continuar'}, 
-    'title': {'en': 'Fields and Crops Dashboard', 'es': 'Tablero de Lotes y Cultivos', 'pt': 'Painel de Campos e Cultivos'}, 
+    'title': {'en': 'Benchmarking Dashboard', 'es': 'Tablero de Benchmarking', 'pt': 'Painel de Benchmarking'}, 
     'title_yield': {"en": "Yield Dashboard", "es": "Tablero de Rindes", "pt": "Painel de Rendimento"}, 
     'ver_mas': {'en': 'see more...', 'es': 'ver más...', 'pt': 'ver mais...'},
     'workspace': {'en': 'Work Space', 'es': 'Espacio de Trabajo', 'pt': 'Espaço de Trabalho'}, 

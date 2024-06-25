@@ -23,6 +23,7 @@ from streamlit_extras.mandatory_date_range import date_range_picker
 import streamlit_google_oauth as oauth
 import plotly.graph_objects as go
 import plotly.express as px
+import matplotlib.pyplot as plt
 
 # Manejo de geometrías
 from shapely.geometry import shape, mapping, Point
@@ -400,9 +401,9 @@ def main_app(user_info):
                 default_end = max_date
 
             # Muestra el selector de rango de fechas
-            st.write("Selecciona un rango de fechas:")
+            st.write(translate("select_date_range", lang))
             selected_date_range = st.date_input(
-                "Rango de fechas",
+                translate("selected_date_range", lang),
                 value=(default_start.date(), default_end.date()),
                 min_value=min_date.date(),
                 max_value=max_date.date()
@@ -567,7 +568,13 @@ def main_app(user_info):
 
         # Crea el mapa
         Map = geemap.Map(center=(centroid_y_mean, centroid_x_mean),zoom=14)
-        
+
+        # Convertir cualquier columna Timestamp a string
+        timestamp_columns = ['crop_date', 'start_date', 'end_date', 'START_DATE', 'END_DATE']
+        for col in timestamp_columns:
+            if col in gdf.columns:
+                gdf[col] = gdf[col].astype(str)
+                
         gdf.crs = "EPSG:4326"
         
         gdf.rename(columns={
@@ -623,33 +630,22 @@ def main_app(user_info):
         # NDVI
         ############################################################################
 
-        # #NDVI SOLO CON INTERPOLACION DIARIA
+        #Suavizado de media movil como limpieza con ventana diaria cada X dias, revisita de sentinel
 
-        # # DataFrame final que almacenará los resultados
+        ###PARALELIZADO
+        
+        from concurrent.futures import ThreadPoolExecutor
+
         # final_df_list = []
-
-        # # Convertir las columnas de fecha a datetime
         # filtered_df['START_DATE'] = pd.to_datetime(filtered_df['START_DATE'])
         # filtered_df['END_DATE'] = pd.to_datetime(filtered_df['END_DATE'])
 
-        # # Filtrar las filas con geometría válida
-        # filtered_df = filtered_df[filtered_df['geometry'].notnull()]
-
-        # # Cantidad de días antes de START_DATE y después de END_DATE que quieres incluir
-        # days_before_start = 30
-        # days_after_end = 30
-
-        # for index, row in filtered_df.iterrows():
-        #     # Extraer la geometría individual y asegurar que es un DataFrame
+        # # Definir una función para procesar un índice dado y llamar a extract_mean_ndvi_date
+        # def process_index(index, row, days_before_start, days_after_end):
         #     lote_gdf_filtrado = pd.DataFrame([row])
-
-        #     print(f"Procesando el índice: {index}")
-
-        #     # Calcular la fecha de inicio extendida y la fecha de fin extendida
         #     extended_start_date = row['START_DATE'] - timedelta(days=days_before_start)
         #     extended_end_date = row['END_DATE'] + timedelta(days=days_after_end)
 
-        #     # Llamar a la función con la geometría actual y las fechas extendidas
         #     try:
         #         df_temp = extract_mean_ndvi_date(
         #             lote_gdf_filtrado,
@@ -658,28 +654,35 @@ def main_app(user_info):
         #         )
         #     except Exception as e:
         #         print(f"Error procesando el índice {index}: {e}")
-        #         continue
+        #         return None
 
         #     if df_temp.empty:
         #         print(f"No se encontraron datos NDVI para el índice: {index}")
-        #         continue
+        #         return None
 
-        #     # Obtener el nombre de la geometría
         #     geom_name = row["field_name"]
-
-        #     # Agregar el nombre de la geometría como columna
         #     df_temp["Lote"] = geom_name
 
-        #     # Agregar el DataFrame temporal a la lista
-        #     final_df_list.append(df_temp)
+        #     return df_temp
 
-        # # Concatenar todos los DataFrames temporales en el DataFrame final
+        # days_before_start = 30
+        # days_after_end = 30
+
+        # with ThreadPoolExecutor() as executor:
+        #     futures = [executor.submit(process_index, index, row, days_before_start, days_after_end)
+        #             for index, row in filtered_df.iterrows()]
+
+        #     for future in futures:
+        #         result = future.result()
+        #         if result is not None and not result.empty:
+        #             final_df_list.append(result)
+
         # if final_df_list:
         #     final_df = pd.concat(final_df_list, ignore_index=True)
         # else:
         #     st.error("No se encontraron datos NDVI para ninguna geometría.")
         #     final_df = pd.DataFrame()
-
+        
         # # Continuar solo si final_df no está vacío
         # if not final_df.empty:
         #     # Crear una tabla pivot con 'Date' como índice, 'Lote' como columnas y 'Mean_NDVI' como valores
@@ -689,6 +692,14 @@ def main_app(user_info):
         #     # Convertir la columna 'Date' a datetime
         #     pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
 
+        #     # Aplicar suavizado por media móvil para cada columna
+        #     window_size = 15 # Puedes ajustar el tamaño de la ventana según tus necesidades
+
+        #     for column in pivot_df.columns:
+        #         if column not in ['Date']:
+        #             pivot_df[column] = pivot_df[column].rolling(window=window_size, min_periods=1, center=True).mean()
+
+            
         #     # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
         #     min_date = pivot_df['Date'].min()
         #     max_date = pivot_df['Date'].max()
@@ -735,178 +746,18 @@ def main_app(user_info):
         #     interpolated_df.reset_index(drop=True, inplace=True)
         #     interpolated_df.index += 1
 
-            # st.write("Datos Interpolados:")
-            # st.write(datos_interpolados)
-            # st.write(interpolated_df)
-        ############################################################
+        from scipy.signal import savgol_filter
 
-        # PRUEBA KNN
-
-        # # DataFrame final que almacenará los resultados
-        # final_df_list = []
-
-        # # Convertir las columnas de fecha a datetime
-        # filtered_df['START_DATE'] = pd.to_datetime(filtered_df['START_DATE'])
-        # filtered_df['END_DATE'] = pd.to_datetime(filtered_df['END_DATE'])
-
-        # # Filtrar las filas con geometría válida
-        # filtered_df = filtered_df[filtered_df['geometry'].notnull()]
-
-        # # Cantidad de días antes de START_DATE y después de END_DATE que quieres incluir
-        # days_before_start = 30
-        # days_after_end = 30
-
-        # for index, row in filtered_df.iterrows():
-        #     # Extraer la geometría individual y asegurar que es un DataFrame
-        #     lote_gdf_filtrado = pd.DataFrame([row])
-
-        #     print(f"Procesando el índice: {index}")
-
-        #     # Calcular la fecha de inicio extendida y la fecha de fin extendida
-        #     extended_start_date = row['START_DATE'] - timedelta(days=days_before_start)
-        #     extended_end_date = row['END_DATE'] + timedelta(days=days_after_end)
-
-        #     # Llamar a la función con la geometría actual y las fechas extendidas
-        #     try:
-        #         df_temp = extract_mean_ndvi_date(
-        #             lote_gdf_filtrado,
-        #             extended_start_date.strftime('%Y-%m-%d'),
-        #             extended_end_date.strftime('%Y-%m-%d')
-        #         )
-        #     except Exception as e:
-        #         print(f"Error procesando el índice {index}: {e}")
-        #         continue
-
-        #     if df_temp.empty:
-        #         print(f"No se encontraron datos NDVI para el índice: {index}")
-        #         continue
-
-        #     # Obtener el nombre de la geometría
-        #     geom_name = row["field_name"]
-
-        #     # Agregar el nombre de la geometría como columna
-        #     df_temp["Lote"] = geom_name
-
-        #     # Agregar el DataFrame temporal a la lista
-        #     final_df_list.append(df_temp)
-
-        # # Concatenar todos los DataFrames temporales en el DataFrame final
-        # if final_df_list:
-        #     final_df = pd.concat(final_df_list, ignore_index=True)
-        # else:
-        #     st.error("No se encontraron datos NDVI para ninguna geometría.")
-        #     final_df = pd.DataFrame()
-
-        # # Continuar solo si final_df no está vacío
-        # if not final_df.empty:
-        #     # Crear una tabla pivot con 'Date' como índice, 'Lote' como columnas y 'Mean_NDVI' como valores
-        #     pivot_df = final_df.pivot_table(index='Date', columns='Lote', values='Mean_NDVI')
-        #     pivot_df.reset_index(inplace=True)
-
-        #     # Convertir la columna 'Date' a datetime
-        #     pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
-
-        #     # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
-        #     min_date = pivot_df['Date'].min()
-        #     max_date = pivot_df['Date'].max()
-        #     all_dates = pd.date_range(start=min_date, end=max_date, freq='D')
-
-        #     # Convertir fechas a un formato numérico (número de días desde la primera fecha)
-        #     pivot_df['DateNum'] = (pivot_df['Date'] - min_date) / np.timedelta64(1, 'D')
-        #     date_num_all = (all_dates - min_date) / np.timedelta64(1, 'D')
-
-        #     # Imputación de datos faltantes usando la media
-        #     imputer = SimpleImputer(strategy='mean')
-
-        #     for column in pivot_df.columns:
-        #         if column not in ['Date', 'DateNum']:
-        #             # Imputar valores faltantes con la media
-        #             pivot_df[[column]] = imputer.fit_transform(pivot_df[[column]])
-
-        #     # Limpieza de datos utilizando KNN para cada lote
-        #     lof = LocalOutlierFactor(n_neighbors=20, contamination=0.1)
-
-        #     for column in pivot_df.columns:
-        #         if column not in ['Date', 'DateNum']:
-        #             # Filtrar valores nulos y preparar datos para la interpolación
-        #             x = pivot_df['DateNum'].values.reshape(-1, 1)
-        #             y = pivot_df[column].values
-
-        #             if x.size == 0 or y.size == 0:
-        #                 print(f"No hay datos suficientes para procesar en la columna: {column}")
-        #                 continue
-
-        #             # Detectar outliers
-        #             outliers = lof.fit_predict(x)
-        #             # Reemplazar outliers por NaN en el DataFrame original
-        #             pivot_df.loc[outliers == -1, column] = np.nan
-
-        #     # Preparar un nuevo DataFrame para almacenar resultados interpolados
-        #     interpolated_df = pd.DataFrame({'Date': all_dates, 'DateNum': date_num_all})
-
-        #     # Interpolar valores faltantes para cada lote usando RBFInterpolator
-        #     for column in pivot_df.columns:
-        #         if column not in ['Date', 'DateNum']:
-        #             # Filtrar valores nulos y preparar datos para la interpolación
-        #             x = pivot_df.loc[pivot_df[column].notna(), 'DateNum']
-        #             y = pivot_df.loc[pivot_df[column].notna(), column]
-
-        #             if x.empty or y.empty:
-        #                 print(f"No hay datos para interpolar en la columna: {column}")
-        #                 continue
-
-        #             # Crear el interpolador RBF
-        #             rbf = RBFInterpolator(x.values[:, None], y.values, kernel='thin_plate_spline')
-
-        #             # Interpolar valores para todas las fechas en interpolated_df
-        #             y_interp = rbf(date_num_all.values[:, None])
-
-        #             # Almacenar resultados interpolados en el DataFrame
-        #             interpolated_df[column] = y_interp
-
-        #     # DataFrame de resultados interpolados antes del filtrado por fecha
-        #     datos_interpolados = interpolated_df.copy()
-
-        #     # Filtrar interpolated_df para que solo incluya datos dentro del intervalo START_DATE y END_DATE
-        #     start_date = filtered_df['START_DATE'].min()
-        #     end_date = filtered_df['END_DATE'].max()
-        #     interpolated_df = interpolated_df[(interpolated_df['Date'] >= start_date) & (interpolated_df['Date'] <= end_date)]
-
-        #     # Eliminar la columna 'DateNum' del DataFrame interpolado
-        #     interpolated_df.drop(columns=['DateNum'], inplace=True)
-
-        #     interpolated_df.reset_index(drop=True, inplace=True)
-        #     interpolated_df.index += 1
-
-        ###################################################################
-
-        #Suaviazado de media movil como limpieza con ventana diaria cada 5 dias, revisita de sentinel
-
-        # DataFrame final que almacenará los resultados
         final_df_list = []
-
-        # Convertir las columnas de fecha a datetime
         filtered_df['START_DATE'] = pd.to_datetime(filtered_df['START_DATE'])
         filtered_df['END_DATE'] = pd.to_datetime(filtered_df['END_DATE'])
 
-        # Filtrar las filas con geometría válida
-        filtered_df = filtered_df[filtered_df['geometry'].notnull()]
-
-        # Cantidad de días antes de START_DATE y después de END_DATE que quieres incluir
-        days_before_start = 30
-        days_after_end = 30
-
-        for index, row in filtered_df.iterrows():
-            # Extraer la geometría individual y asegurar que es un DataFrame
+        # Definir una función para procesar un índice dado y llamar a extract_mean_ndvi_date
+        def process_index(index, row, days_before_start, days_after_end):
             lote_gdf_filtrado = pd.DataFrame([row])
-
-            print(f"Procesando el índice: {index}")
-
-            # Calcular la fecha de inicio extendida y la fecha de fin extendida
             extended_start_date = row['START_DATE'] - timedelta(days=days_before_start)
             extended_end_date = row['END_DATE'] + timedelta(days=days_after_end)
 
-            # Llamar a la función con la geometría actual y las fechas extendidas
             try:
                 df_temp = extract_mean_ndvi_date(
                     lote_gdf_filtrado,
@@ -915,22 +766,29 @@ def main_app(user_info):
                 )
             except Exception as e:
                 print(f"Error procesando el índice {index}: {e}")
-                continue
+                return None
 
             if df_temp.empty:
                 print(f"No se encontraron datos NDVI para el índice: {index}")
-                continue
+                return None
 
-            # Obtener el nombre de la geometría
             geom_name = row["field_name"]
-
-            # Agregar el nombre de la geometría como columna
             df_temp["Lote"] = geom_name
 
-            # Agregar el DataFrame temporal a la lista
-            final_df_list.append(df_temp)
+            return df_temp
 
-        # Concatenar todos los DataFrames temporales en el DataFrame final
+        days_before_start = 30
+        days_after_end = 30
+
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(process_index, index, row, days_before_start, days_after_end)
+                    for index, row in filtered_df.iterrows()]
+
+            for future in futures:
+                result = future.result()
+                if result is not None and not result.empty:
+                    final_df_list.append(result)
+
         if final_df_list:
             final_df = pd.concat(final_df_list, ignore_index=True)
         else:
@@ -946,11 +804,14 @@ def main_app(user_info):
             # Convertir la columna 'Date' a datetime
             pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
 
-            # Aplicar suavizado por media móvil para cada columna
-            window_size = 5  # Puedes ajustar el tamaño de la ventana según tus necesidades
+            # Aplicar filtro de Savitzky–Golay para cada columna
+            window_size = 15  # Tamaño de la ventana (debe ser un número impar)
+            poly_order = 3    # Orden del polinomio
+
             for column in pivot_df.columns:
                 if column not in ['Date']:
-                    pivot_df[column] = pivot_df[column].rolling(window=window_size, min_periods=1, center=True).mean()
+                    # Aplicar el filtro de Savitzky–Golay
+                    pivot_df[column] = savgol_filter(pivot_df[column].interpolate(), window_length=window_size, polyorder=poly_order)
 
             # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
             min_date = pivot_df['Date'].min()
@@ -998,11 +859,8 @@ def main_app(user_info):
             interpolated_df.reset_index(drop=True, inplace=True)
             interpolated_df.index += 1
 
-        ###PARALELIZADO
-
-        
-
-        ##################################################################################################
+            
+            ##################################################################################################
         
             ############################################################################
             
@@ -1036,6 +894,11 @@ def main_app(user_info):
             
             st.dataframe(interpolated_df2,                        
                         width=100000)
+            
+            # from streamlit_extras.dataframe_explorer import dataframe_explorer #DF que permite hacer filtrado
+
+            # ndvi_df = dataframe_explorer(interpolated_df2, case=False)
+            # st.dataframe(ndvi_df, use_container_width=True)
             
             ############################################################################
 
@@ -1144,8 +1007,8 @@ def main_app(user_info):
 
             # Personalizar el diseño
             fig.update_layout(                
-                xaxis_title='Date',
-                yaxis_title='Lote',
+                xaxis_title= translate("date2", lang),
+                yaxis_title= translate("field", lang),
                 autosize = True)
             
             fig.update_traces(
@@ -1178,7 +1041,7 @@ def main_app(user_info):
             # Ajustar el layout del gráfico
             fig.update_layout(
                 yaxis_title="NDVI",
-                xaxis_title="Lote",
+                xaxis_title= translate("field", lang),
                 boxmode='group',                                 
                 autosize = True
             )
@@ -1268,25 +1131,37 @@ def main_app(user_info):
 
             st.plotly_chart(fig_integral, use_container_width=True)
 
-            # st.write(translate('ndvi_sd_rank', lang))
+            st.write(translate('ndvi_sd_rank', lang))
 
-            # fig_desvio = px.bar(ranking_desvio, x='Lote', y='Desvio_Estandar')
-            # fig_desvio.update_xaxes(title_text= translate('field', lang))  # Actualizar el título del eje x
-            # fig_desvio.update_yaxes(title_text= translate('ndvi_sd', lang))  # Actualizar el título del eje y
+            fig_desvio = px.bar(ranking_desvio, x='Lote', y='Desvio_Estandar')
+            fig_desvio.update_xaxes(title_text= translate('field', lang))  # Actualizar el título del eje x
+            fig_desvio.update_yaxes(title_text= translate('ndvi_sd', lang))  # Actualizar el título del eje y
 
-            # # Ajustar el ancho de las barras
-            # fig_desvio.update_traces(width=0.4)
+            # Ajustar el ancho de las barras
+            fig_desvio.update_traces(width=0.4)
 
-            # fig_desvio.update_traces(
-            #     hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
-            #     )
+            fig_desvio.update_traces(
+                hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
+                )
             
-            # st.plotly_chart(fig_desvio, use_container_width=True)
+            st.plotly_chart(fig_desvio, use_container_width=True)
 
             # Graficar los rankings con plotly.graph_objects
 
             st.write(translate('ndvi_sd_cv_rank', 'es'))
 
+            fig_cv = px.bar(ranking_cv, x='Lote', y='CV_%')
+            fig_cv.update_xaxes(title_text= translate('field', lang))  # Actualizar el título del eje x
+            fig_cv.update_yaxes(title_text= translate('ndvi_sd', lang))  # Actualizar el título del eje y
+
+            # Ajustar el ancho de las barras
+            fig_cv.update_traces(width=0.4)
+
+            fig_cv.update_traces(
+                hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
+                )
+            
+            st.plotly_chart(fig_cv, use_container_width=True)
             
             # Crear la figura
             fig = go.Figure()
@@ -1295,7 +1170,7 @@ def main_app(user_info):
             fig.add_trace(go.Bar(
                 x=ranking_desvio['Lote'],
                 y=ranking_desvio['Desvio_Estandar'],
-                name=translate('ndvi_sd', 'es'),
+                name='Desvío Estándar de NDVI',
                 marker=dict(color='blue'),
                 yaxis='y1'
             ))
@@ -1304,23 +1179,20 @@ def main_app(user_info):
             fig.add_trace(go.Bar(
                 x=ranking_cv['Lote'],
                 y=ranking_cv['CV_%'],
-                name=translate('cv_percent', 'es'),
+                name='Coeficiente de Variación (%)',
                 marker=dict(color='red'),
                 yaxis='y2'
             ))
 
-            # Factor de escala entre los dos ejes
-            scale_factor = 100
-
             # Actualizar las configuraciones del layout para incluir dos ejes Y y agrupar las barras
             fig.update_layout(
-                title=translate('ndvi_sd_cv_rank', 'es'),
+                title='Ranking de Desvío Estándar y CV de NDVI',
                 xaxis=dict(
-                    title=translate('field', 'es'),
+                    title='Lote',
                     tickfont_size=14
                 ),
                 yaxis=dict(
-                    title=translate('ndvi_sd', 'es'),
+                    title='Desvío Estándar de NDVI',
                     titlefont_size=16,
                     tickfont_size=14,
                     side='left',
@@ -1328,7 +1200,7 @@ def main_app(user_info):
                     showgrid=True
                 ),
                 yaxis2=dict(
-                    title=translate('cv_percent', 'es'),
+                    title='Coeficiente de Variación (%)',
                     titlefont_size=16,
                     tickfont_size=14,
                     side='right',
@@ -1349,11 +1221,77 @@ def main_app(user_info):
 
             # Configurar hovertemplate para todas las trazas
             fig.update_traces(
-                hovertemplate=f'<b>{translate("field", "es")}:</b> %{{x}}<br>%{{y}}<extra></extra>'
+                hovertemplate='<b>Lote:</b> %{x}<br>%{y}<extra></extra>'
             )
 
             # Mostrar el gráfico en Streamlit
             st.plotly_chart(fig, use_container_width=True)
+
+            # Crear la figura
+            fig = go.Figure()
+
+            # Añadir las barras del Desvío Estándar
+            fig.add_trace(go.Bar(
+                x=ranking_desvio['Lote'],
+                y=ranking_desvio['Desvio_Estandar'],
+                name='Desvío Estándar de NDVI',
+                marker=dict(color='blue'),
+                yaxis='y1'
+            ))
+
+            # Añadir los puntos del Coeficiente de Variación
+            fig.add_trace(go.Scatter(
+                x=ranking_cv['Lote'],
+                y=ranking_cv['CV_%'],
+                name='Coeficiente de Variación (%)',
+                mode='markers',
+                marker=dict(color='red', size=10),
+                yaxis='y2'
+            ))
+
+            # Actualizar las configuraciones del layout para incluir dos ejes Y
+            fig.update_layout(
+                title='Ranking de Desvío Estándar y CV de NDVI',
+                xaxis=dict(
+                    title='Lote',
+                    tickfont_size=14
+                ),
+                yaxis=dict(
+                    title='Desvío Estándar de NDVI',
+                    titlefont_size=16,
+                    tickfont_size=14,
+                    side='left',
+                    range=[0, 1],  # Ajustar el rango del eje y1
+                    showgrid=True
+                ),
+                yaxis2=dict(
+                    title='Coeficiente de Variación (%)',
+                    titlefont_size=16,
+                    tickfont_size=14,
+                    side='right',
+                    overlaying='y',
+                    range=[0, 100],  # Ajustar el rango del eje y2
+                    showgrid=False
+                ),
+                legend=dict(
+                    x=0,
+                    y=1.1,
+                    bgcolor='rgba(255, 255, 255, 0)',
+                    bordercolor='rgba(255, 255, 255, 0)'
+                ),
+                barmode='group',  # Agrupar las barras una al lado de la otra
+                bargap=0.15,      # Espacio entre barras de diferentes categorías
+                bargroupgap=0.1   # Espacio entre barras de la misma categoría
+            )
+
+            # Configurar hovertemplate para todas las trazas
+            fig.update_traces(
+                hovertemplate='<b>Lote:</b> %{x}<br>%{y}<extra></extra>'
+            )
+
+            # Mostrar el gráfico en Streamlit
+            st.plotly_chart(fig, use_container_width=True)
+            
             
             ############################################################################
         
@@ -1366,6 +1304,7 @@ def main_app(user_info):
 if __name__ == "__main__":
     redirect_uri=" http://localhost:8501"
     user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'test', 'domainId': 1, 'areaId': 1, 'workspaceId': 882, 'seasonId': 172, 'farmId': 2016} # TEST / GeoAgro / GeoAgro / TEST_BONELLI / 2021-22 / Lacau SA - Antares
+    #user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'prod', 'domainId': 1, 'areaId': 1, 'workspaceId': 65, 'seasonId': 3486, 'farmId': 11143} 
     st.session_state['user_info'] = user_info
     main_app(user_info)
 
