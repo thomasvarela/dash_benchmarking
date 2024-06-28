@@ -401,9 +401,9 @@ def main_app(user_info):
                 default_end = max_date
 
             # Muestra el selector de rango de fechas
-            st.write(translate("select_date_range", lang))
+            #st.write(translate("select_date_range", lang))
             selected_date_range = st.date_input(
-                translate("selected_date_range", lang),
+                translate("select_date_range", lang),
                 value=(default_start.date(), default_end.date()),
                 min_value=min_date.date(),
                 max_value=max_date.date()
@@ -805,8 +805,8 @@ def main_app(user_info):
             pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
 
             # Aplicar filtro de Savitzky–Golay para cada columna
-            window_size = 15  # Tamaño de la ventana (debe ser un número impar)
-            poly_order = 3    # Orden del polinomio
+            window_size = 20  # Tamaño de la ventana (debe ser un número impar)
+            poly_order = 5    # Orden del polinomio
 
             for column in pivot_df.columns:
                 if column not in ['Date']:
@@ -859,6 +859,46 @@ def main_app(user_info):
             interpolated_df.reset_index(drop=True, inplace=True)
             interpolated_df.index += 1
 
+            ############################################################################
+            #COLORES Y ORDEN DE LOS LOTES
+        
+            # Obtener la lista de lotes únicos y asignar colores
+            lotes = sorted(filtered_df['field_name'].unique().tolist())
+            selected_colors = px.colors.qualitative.T10
+
+            # Crear un diccionario para asignar colores a cada lote
+            color_map = {lote: {'color': selected_colors[i % len(selected_colors)], 'order': i} for i, lote in enumerate(lotes)}
+
+            # Función para aplicar colores fijos a los gráficos
+            def apply_colors(fig, data, color_column):
+                fig.for_each_trace(lambda t: t.update(marker_color=color_map.get(t.name, '#636efa')))
+                return fig
+            
+            def create_bar_chart(df, y_column, lotes, color_map):
+                data = []
+                for lot in lotes:
+                    filtered_values = df[df['Lote'] == lot][y_column].values
+                    if len(filtered_values) > 0:
+                        data.append({
+                            'x': lot,
+                            'y': filtered_values[0],
+                            'color': color_map.get(lot, '#4C78A8')  # Usar el color del color_map o un color por defecto
+                        })
+                    else:
+                        data.append({
+                            'x': lot,
+                            'y': 0,
+                            'color': color_map.get(lot, '#4C78A8')  # Usar el color del color_map o un color por defecto
+                        })
+                
+                fig = go.Figure(data=[go.Bar(
+                    x=[d['x'] for d in data],
+                    y=[d['y'] for d in data],
+                    marker_color=[d['color'] for d in data]
+                )])
+                
+                return fig
+
             
             ##################################################################################################
         
@@ -910,10 +950,24 @@ def main_app(user_info):
 
             # Calcular la media de las columnas NDVI (suponiendo que las columnas NDVI son todas excepto la primera columna 'Date')
             ndvi_columns = interpolated_df.columns[1:]
+            color_map = {column: color_map[column]['color'] for column in ndvi_columns}
             interpolated_df['PROMEDIO'] = interpolated_df[ndvi_columns].mean(axis=1)
 
             # Crear un gráfico de líneas usando Plotly Express
-            fig = px.line(interpolated_df, x='Date', y=ndvi_columns)
+            fig = go.Figure()
+
+            # Añadir las líneas individuales para cada columna NDVI
+            for column in ndvi_columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=interpolated_df['Date'],
+                        y=interpolated_df[column],
+                        mode='lines',
+                        name=column,
+                        line=dict(color=color_map[column], width=2),
+                        showlegend=True  # Mostrar la leyenda para cada línea individual
+                    )
+                )
 
             # Añadir la curva promedio
             fig.add_trace(
@@ -922,7 +976,8 @@ def main_app(user_info):
                     y=interpolated_df['PROMEDIO'],
                     mode='lines',
                     name=translate('average', lang),
-                    line=dict(color='firebrick', width=4, dash='dash')
+                    line=dict(color='firebrick', width=4, dash='dash'),
+                    showlegend=True  # Mostrar la leyenda para la curva promedio
                 )
             )
 
@@ -931,25 +986,20 @@ def main_app(user_info):
                 xaxis_title=translate('date2', lang),  # Cambiar el título del eje x si es necesario
                 yaxis_title='NDVI',  # Cambiar el título del eje y si es necesario
                 legend_title=translate('field', lang),  # Cambiar el título de la leyenda
-                width=1400,                
+                width=1400,
                 autosize=False,
             )
 
-            # Personalizar el cuadro interactivo (tooltip)
-            for column in ndvi_columns:
+            # Personalizar el tooltip
+            for column in ndvi_columns + ['PROMEDIO']:
                 fig.update_traces(
                     selector=dict(name=column),
-                    hovertemplate=f'<b>{translate("date2", lang)}:</b> %{{x}}<br><b>{translate("field", lang)}:</b> {column}<br><b>NDVI:</b> %{{y}}' # Traducir variables del cuadro interactivo
+                    hovertemplate=f'<b>Fecha:</b> %{{x}}<br><b>Lote:</b> {column}<br><b>NDVI:</b> %{{y}}'
                 )
-
-            # Personalizar el tooltip para la curva PROMEDIO
-            fig.update_traces(
-                selector=dict(name='PROMEDIO'),
-                hovertemplate=f'<b>{translate("date2", lang)}:</b> %{{x}}<br><b>{translate("field", lang)}:</b> PROMEDIO<br><b>NDVI:</b> %{{y}}'
-            )
 
             st.plotly_chart(fig, use_container_width=True)
 
+                        
             ############################################################################
 
             interpolated_df.drop('PROMEDIO', axis=1, inplace=True)
@@ -1030,23 +1080,25 @@ def main_app(user_info):
             fig = go.Figure()
 
             # Iterar sobre las columnas de 'interpolated_df' excepto la columna 'Date'
-            for column in interpolated_df.columns[1:]:  # Saltar la columna 'Date'
+            for i, column in enumerate(ndvi_columns):
                 fig.add_trace(go.Box(
                     y=interpolated_df[column],
                     name=column,
-                    width=0.4  # Ajustar el ancho de las cajas (puedes ajustar el valor según tu preferencia)
+                    marker_color=color_map[column],  # Asignar color según el color_map
+                    width=0.4  # Ajustar el ancho de las cajas según tu preferencia
                     )
                 )
-            
+
             # Ajustar el layout del gráfico
             fig.update_layout(
                 yaxis_title="NDVI",
-                xaxis_title= translate("field", lang),
-                boxmode='group',                                 
-                autosize = True
+                xaxis_title=translate("field", lang),
+                boxmode='group',
+                autosize=True,
             )
 
-            
+            fig.update_xaxes(tickangle=-45)
+
             st.plotly_chart(fig, use_container_width=True)
 
             ############################################################################
@@ -1055,8 +1107,7 @@ def main_app(user_info):
 
             st.divider()
             st.markdown('')
-            st.markdown(f"<b>Ranking</b>", unsafe_allow_html=True)
-
+            
             interpolated_df['Date'] = pd.to_datetime(interpolated_df['Date'])
             pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
 
@@ -1099,6 +1150,8 @@ def main_app(user_info):
             
             ############################################################################
 
+            #GRAFICOS DE RANKING
+
             # Verificar si 'DateNum' está presente como el primer elemento en la lista de lotes
             
             # Obtener el índice de la fila que contiene "DateNum"
@@ -1114,54 +1167,110 @@ def main_app(user_info):
             if 'DateNum' in ranking_cv['Lote'].values:
                 ranking_cv = ranking_cv[ranking_cv['Lote'] != 'DateNum']
 
+            ranking_df2 = ranking_df
+
+            if ranking_df2['Lote'].iloc[index_date_num] == 'DateNum':
+                    ranking_df2 = ranking_df.drop(index=index_date_num)
+
+            # Obtener los nombres de los lotes según el orden del diccionario
+            ordered_lotes = list(color_map.keys())
+
+            # Convertir la columna 'Lote' en una categoría con el orden deseado
+            ranking_df2['Lote'] = pd.Categorical(ranking_df2['Lote'], categories=ordered_lotes, ordered=True)
+
+            # Ordenar el DataFrame por la columna 'Lote'
+            ranking_df2 = ranking_df2.sort_values(by='Lote').reset_index(drop=True)
+
+            lotes = ranking_df2['Lote'].unique()
+
+            ############################################################################
+            #GRAFICA DE INTEGRAL
+
+            st.markdown(translate('ndvi_integral_rank', lang))
+
+            
+            tab1, tab2 = st.tabs(["Ranking", translate("field",lang)])
+
+            with tab1:
+
+                st.markdown('')
+                st.markdown('')
+                st.markdown('')
+
             # Graficar los rankings con plotly.express
 
-            st.write(translate('ndvi_integral_rank', lang))
+                fig_integral = px.bar(ranking_integral, x='Lote', y='Integral_NDVI')
+                fig_integral.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
+                fig_integral.update_yaxes(title_text= translate('ndvi_integral', lang))
 
-            fig_integral = px.bar(ranking_integral, x='Lote', y='Integral_NDVI')
-            fig_integral.update_xaxes(title_text= translate('field', lang))  # Actualizar el título del eje x
-            fig_integral.update_yaxes(title_text= translate('ndvi_integral', lang))
+                
+                fig_integral.update_traces(
+                    marker_color='#4C78A8',
+                    hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_integral", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
+                    )
 
-            # Ajustar el ancho de las barras
-            fig_integral.update_traces(width=0.4)
+                st.plotly_chart(fig_integral, use_container_width=True)
 
-            fig_integral.update_traces(
-                hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_integral", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
+            with tab2:
+                
+                fig_integral2 = create_bar_chart(ranking_df2, 'Integral_NDVI', lotes, color_map)  # En función del Color_map
+
+                fig_integral2.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
+                fig_integral2.update_yaxes(title_text= translate('ndvi_integral', lang))
+
+                fig_integral2.update_traces(
+                    hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_integral", lang)}:</b> %{{y}}<extra></extra>'  # Traducir variables del cuadro interactivo
                 )
+                
+                # Ajustar la altura del gráfico
+                # fig_integral2.update_layout(height=500) 
 
-            st.plotly_chart(fig_integral, use_container_width=True)
+                st.plotly_chart(fig_integral2, use_container_width=True)
+            ############################################################################
+            #GRAFICA SD
 
             st.write(translate('ndvi_sd_rank', lang))
 
-            fig_desvio = px.bar(ranking_desvio, x='Lote', y='Desvio_Estandar')
-            fig_desvio.update_xaxes(title_text= translate('field', lang))  # Actualizar el título del eje x
-            fig_desvio.update_yaxes(title_text= translate('ndvi_sd', lang))  # Actualizar el título del eje y
+            tab1, tab2 = st.tabs(["Ranking", translate("field",lang)])
 
-            # Ajustar el ancho de las barras
-            fig_desvio.update_traces(width=0.4)
+            with tab1:
 
-            fig_desvio.update_traces(
-                hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
-                )
-            
-            st.plotly_chart(fig_desvio, use_container_width=True)
+                st.markdown('')
+                st.markdown('')
+                st.markdown('')
 
-            # Graficar los rankings con plotly.graph_objects
+            # Graficar los rankings con plotly.express
 
-            st.write(translate('ndvi_sd_cv_rank', 'es'))
+                fig_desvio = px.bar(ranking_desvio, x='Lote', y='Desvio_Estandar')
+                fig_desvio.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
+                fig_desvio.update_yaxes(title_text= translate('ndvi_sd', lang))
 
-            fig_cv = px.bar(ranking_cv, x='Lote', y='CV_%')
-            fig_cv.update_xaxes(title_text= translate('field', lang))  # Actualizar el título del eje x
-            fig_cv.update_yaxes(title_text= translate('ndvi_sd', lang))  # Actualizar el título del eje y
+                
+                fig_desvio.update_traces(
+                    marker_color='#4C78A8',
+                    hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
+                    )
 
-            # Ajustar el ancho de las barras
-            fig_cv.update_traces(width=0.4)
+                st.plotly_chart(fig_desvio, use_container_width=True)
 
-            fig_cv.update_traces(
-                hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
-                )
-            
-            st.plotly_chart(fig_cv, use_container_width=True)
+            with tab2:
+                
+                fig_desvio2 = create_bar_chart(ranking_df2, 'Desvio_Estandar', lotes, color_map) #En funcion del Color_map
+
+                fig_desvio2.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
+                fig_desvio2.update_yaxes(title_text= translate('ndvi_sd', lang))
+
+                fig_desvio2.update_traces(
+                    hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
+                    )
+                
+                # Ajustar la altura del gráfico
+                fig_desvio2.update_layout(height=500) 
+
+                st.plotly_chart(fig_desvio2, use_container_width=True)
+
+            ############################################################################
+            #GRAFICA SD Y CV
             
             # Crear la figura
             fig = go.Figure()
@@ -1170,72 +1279,8 @@ def main_app(user_info):
             fig.add_trace(go.Bar(
                 x=ranking_desvio['Lote'],
                 y=ranking_desvio['Desvio_Estandar'],
-                name='Desvío Estándar de NDVI',
-                marker=dict(color='blue'),
-                yaxis='y1'
-            ))
-
-            # Añadir las barras del Coeficiente de Variación
-            fig.add_trace(go.Bar(
-                x=ranking_cv['Lote'],
-                y=ranking_cv['CV_%'],
-                name='Coeficiente de Variación (%)',
-                marker=dict(color='red'),
-                yaxis='y2'
-            ))
-
-            # Actualizar las configuraciones del layout para incluir dos ejes Y y agrupar las barras
-            fig.update_layout(
-                title='Ranking de Desvío Estándar y CV de NDVI',
-                xaxis=dict(
-                    title='Lote',
-                    tickfont_size=14
-                ),
-                yaxis=dict(
-                    title='Desvío Estándar de NDVI',
-                    titlefont_size=16,
-                    tickfont_size=14,
-                    side='left',
-                    range=[0, 1],  # Ajustar el rango del eje y1
-                    showgrid=True
-                ),
-                yaxis2=dict(
-                    title='Coeficiente de Variación (%)',
-                    titlefont_size=16,
-                    tickfont_size=14,
-                    side='right',
-                    overlaying='y',
-                    range=[0, 100],  # Ajustar el rango del eje y2
-                    showgrid=False
-                ),
-                legend=dict(
-                    x=0,
-                    y=1.1,
-                    bgcolor='rgba(255, 255, 255, 0)',
-                    bordercolor='rgba(255, 255, 255, 0)'
-                ),
-                barmode='group',  # Agrupar las barras una al lado de la otra
-                bargap=0.15,      # Espacio entre barras de diferentes categorías
-                bargroupgap=0.1   # Espacio entre barras de la misma categoría
-            )
-
-            # Configurar hovertemplate para todas las trazas
-            fig.update_traces(
-                hovertemplate='<b>Lote:</b> %{x}<br>%{y}<extra></extra>'
-            )
-
-            # Mostrar el gráfico en Streamlit
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Crear la figura
-            fig = go.Figure()
-
-            # Añadir las barras del Desvío Estándar
-            fig.add_trace(go.Bar(
-                x=ranking_desvio['Lote'],
-                y=ranking_desvio['Desvio_Estandar'],
-                name='Desvío Estándar de NDVI',
-                marker=dict(color='blue'),
+                name=translate('field', lang),
+                marker=dict(color='#4C78A8'),
                 yaxis='y1'
             ))
 
@@ -1243,21 +1288,22 @@ def main_app(user_info):
             fig.add_trace(go.Scatter(
                 x=ranking_cv['Lote'],
                 y=ranking_cv['CV_%'],
-                name='Coeficiente de Variación (%)',
+                name=translate('cv', lang),
                 mode='markers',
-                marker=dict(color='red', size=10),
+                marker=dict(color='#E45756', size=10),
                 yaxis='y2'
             ))
 
             # Actualizar las configuraciones del layout para incluir dos ejes Y
             fig.update_layout(
-                title='Ranking de Desvío Estándar y CV de NDVI',
+                title=translate('cv_rank', lang),
                 xaxis=dict(
-                    title='Lote',
-                    tickfont_size=14
+                    title=translate('field', lang),
+                    tickfont_size=14,
+                    tickangle=-45
                 ),
                 yaxis=dict(
-                    title='Desvío Estándar de NDVI',
+                    title=translate('ndvi_sd', lang),
                     titlefont_size=16,
                     tickfont_size=14,
                     side='left',
@@ -1265,7 +1311,7 @@ def main_app(user_info):
                     showgrid=True
                 ),
                 yaxis2=dict(
-                    title='Coeficiente de Variación (%)',
+                    title=translate('cv', lang),
                     titlefont_size=16,
                     tickfont_size=14,
                     side='right',
@@ -1286,14 +1332,16 @@ def main_app(user_info):
 
             # Configurar hovertemplate para todas las trazas
             fig.update_traces(
-                hovertemplate='<b>Lote:</b> %{x}<br>%{y}<extra></extra>'
+                hovertemplate=f'<b>{translate("field", lang)}:</b>%{x}<b>{translate("cv", lang)}:</b>%{y}<extra></extra>'
             )
+
+            
 
             # Mostrar el gráfico en Streamlit
             st.plotly_chart(fig, use_container_width=True)
             
             
-            ############################################################################
+        ############################################################################
         
         st.divider()
         st.markdown('')
@@ -1303,8 +1351,8 @@ def main_app(user_info):
 
 if __name__ == "__main__":
     redirect_uri=" http://localhost:8501"
-    user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'test', 'domainId': 1, 'areaId': 1, 'workspaceId': 882, 'seasonId': 172, 'farmId': 2016} # TEST / GeoAgro / GeoAgro / TEST_BONELLI / 2021-22 / Lacau SA - Antares
-    #user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'prod', 'domainId': 1, 'areaId': 1, 'workspaceId': 65, 'seasonId': 3486, 'farmId': 11143} 
+    # user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'test', 'domainId': 1, 'areaId': 1, 'workspaceId': 882, 'seasonId': 172, 'farmId': 2016} # TEST / GeoAgro / GeoAgro / TEST_BONELLI / 2021-22 / Lacau SA - Antares
+    user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'prod', 'domainId': 1, 'areaId': 1, 'workspaceId': 65, 'seasonId': 3486, 'farmId': 11143} 
     st.session_state['user_info'] = user_info
     main_app(user_info)
 

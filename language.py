@@ -44,7 +44,7 @@ translate_dict = {
     'seeding_date_by': {'en': 'Seeding Date by ', 'es': 'Fecha de siembra por ', 'pt': 'Data de Semeadura por '}, 
     'seeding_progress': {'en': 'Seeding progress', 'es': 'Avance de siembra', 'pt': 'Progresso da semeadura'}, 
     'select_all': {'en': 'Select all', 'es': 'Seleccionar todo', 'pt': 'Selecionar tudo'}, 
-    'select_date_range': {'en': 'Select Date Range:', 'es': 'Seleccionar Rango de Fechas:', 'pt': 'Selecionar Intervalo de Datas:'}, 
+    'select_date_range': {'en': 'Select Date Range', 'es': 'Seleccionar Rango de Fechas', 'pt': 'Selecionar Intervalo de Datas'}, 
     'select_grouping_field': {'en': 'Select a grouping field:', 'es': 'Seleccione un campo de agrupamiento:', 'pt': 'Selecione um campo de agrupamento:'}, 
     'select_fields': {'en': 'Selected Fields', 'es': 'Lotes Seleccionados', 'pt': 'Lotes Selecionados'},
     'select_warning': {'en': 'You must select a field to continue', 'es': 'Debe seleccionar un lote para continuar', 'pt': 'Você deve selecionar um campo para continuar'}, 
@@ -85,5 +85,7 @@ translate_dict = {
     'ndvi_sd': {'en': 'NDVI Standard Deviation', 'es': 'Desvío Estándar de NDVI', 'pt': 'Desvio Padrão do NDVI'},
     'ndvi_sd_rank': {'en': 'NDVI Standard Deviation Ranking', 'es': 'Ranking por Desvío Estándar de NDVI', 'pt': 'Classificação de Desvio Padrão do NDVI'},
     'ndvi_integral_rank': {'en': 'NDVI Integral Ranking', 'es': 'Ranking por Integral de NDVI', 'pt': 'Classificação de Integral do NDVI'},
-    'average': {'en': 'Average', 'es': 'Promedio', 'pt': 'Média'}                                   
+    'average': {'en': 'Average', 'es': 'Promedio', 'pt': 'Média'},
+    'cv': {'en': 'Coefficient of Variation (%)', 'es': 'Coeficiente de Variación (%)', 'pt': 'Coeficiente de Variação (%)'},
+    'cv_rank': {'en': 'NDVI Standard Deviation and CV Ranking', 'es': 'Ranking por Desvío Estándar y CV de NDVI', 'pt': 'Classificação de Desvio Padrão e CV do NDVI'}
     }
