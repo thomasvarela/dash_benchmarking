@@ -1059,7 +1059,8 @@ def main_app(user_info):
             fig.update_layout(                
                 xaxis_title= translate("date2", lang),
                 yaxis_title= translate("field", lang),
-                autosize = True)
+                autosize = True,
+                height=650)
             
             fig.update_traces(
                 hovertemplate=f'<b>{translate("date2", lang)}:</b> %{{x}}<br><b>{translate("field", lang)}:</b> {column}<br><b>NDVI:</b> %{{z}}<extra></extra>' #Traducir variables del cuadro interactivo
