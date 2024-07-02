@@ -87,5 +87,8 @@ translate_dict = {
     'ndvi_integral_rank': {'en': 'NDVI Integral Ranking', 'es': 'Ranking por Integral de NDVI', 'pt': 'Classificação de Integral do NDVI'},
     'average': {'en': 'Average', 'es': 'Promedio', 'pt': 'Média'},
     'cv': {'en': 'Coefficient of Variation (%)', 'es': 'Coeficiente de Variación (%)', 'pt': 'Coeficiente de Variação (%)'},
-    'cv_rank': {'en': 'NDVI Standard Deviation and CV Ranking', 'es': 'Ranking por Desvío Estándar y CV de NDVI', 'pt': 'Classificação de Desvio Padrão e CV do NDVI'}
+    'cv_rank': {'en': 'NDVI Standard Deviation and CV Ranking', 'es': 'Ranking por Desvío Estándar y CV de NDVI', 'pt': 'Classificação de Desvio Padrão e CV do NDVI'},
+    'colour': {'en': 'Colour', 'es': 'Color', 'pt': 'Cor'},
+    'cleaning_option': {'en': 'Statistical Cleaning', 'es': 'Limpieza Estadistica', 'pt': 'Limpeza Estatística'},
+    'raw_data_option': {'en': 'Raw Data', 'es': 'Datos Sin Procesar', 'pt': 'Dados Não Trarados'}
     }

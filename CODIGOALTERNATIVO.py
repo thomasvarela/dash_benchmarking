@@ -376,3 +376,120 @@
 
         #     interpolated_df.reset_index(drop=True, inplace=True)
         #     interpolated_df.index += 1
+
+
+
+
+#######################################################################################
+
+#SUAVIZADO CADA 15 DIAS - ESTE ESTABA FUNCIONANDO
+
+            # final_df_list = []
+            # filtered_df['START_DATE'] = pd.to_datetime(filtered_df['START_DATE'])
+            # filtered_df['END_DATE'] = pd.to_datetime(filtered_df['END_DATE'])
+
+            # # Definir una función para procesar un índice dado y llamar a extract_mean_ndvi_date
+            # def process_index(index, row, days_before_start, days_after_end):
+            #     lote_gdf_filtrado = pd.DataFrame([row])
+            #     extended_start_date = row['START_DATE'] - timedelta(days=days_before_start)
+            #     extended_end_date = row['END_DATE'] + timedelta(days=days_after_end)
+
+            #     try:
+            #         df_temp = extract_mean_ndvi_date(
+            #             lote_gdf_filtrado,
+            #             extended_start_date.strftime('%Y-%m-%d'),
+            #             extended_end_date.strftime('%Y-%m-%d')
+            #         )
+            #     except Exception as e:
+            #         print(f"Error procesando el índice {index}: {e}")
+            #         return None
+
+            #     if df_temp.empty:
+            #         print(f"No se encontraron datos NDVI para el índice: {index}")
+            #         return None
+
+            #     geom_name = row["field_name"]
+            #     df_temp["Lote"] = geom_name
+
+            #     return df_temp
+
+            # days_before_start = 30
+            # days_after_end = 30
+
+            # with ThreadPoolExecutor() as executor:
+            #     futures = [executor.submit(process_index, index, row, days_before_start, days_after_end)
+            #             for index, row in filtered_df.iterrows()]
+
+            #     for future in futures:
+            #         result = future.result()
+            #         if result is not None and not result.empty:
+            #             final_df_list.append(result)
+
+            # if final_df_list:
+            #     final_df = pd.concat(final_df_list, ignore_index=True)
+            # else:
+            #     st.error("No se encontraron datos NDVI para ninguna geometría.")
+            #     final_df = pd.DataFrame()
+            
+            # # Continuar solo si final_df no está vacío
+            # if not final_df.empty:
+            #     # Crear una tabla pivot con 'Date' como índice, 'Lote' como columnas y 'Mean_NDVI' como valores
+            #     pivot_df = final_df.pivot_table(index='Date', columns='Lote', values='Mean_NDVI')
+            #     pivot_df.reset_index(inplace=True)
+
+            #     # Convertir la columna 'Date' a datetime
+            #     pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
+
+            #     # Aplicar suavizado por media móvil para cada columna
+            #     window_size = 15 # Puedes ajustar el tamaño de la ventana según tus necesidades
+
+            #     for column in pivot_df.columns:
+            #         if column not in ['Date']:
+            #             pivot_df[column] = pivot_df[column].rolling(window=window_size, min_periods=1, center=True).mean()
+
+                
+            #     # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
+            #     min_date = pivot_df['Date'].min()
+            #     max_date = pivot_df['Date'].max()
+            #     all_dates = pd.date_range(start=min_date, end=max_date, freq='D')
+
+            #     # Convertir fechas a un formato numérico (número de días desde la primera fecha)
+            #     pivot_df['DateNum'] = (pivot_df['Date'] - min_date) / np.timedelta64(1, 'D')
+            #     date_num_all = (all_dates - min_date) / np.timedelta64(1, 'D')
+
+            #     # Preparar un nuevo DataFrame para almacenar resultados interpolados
+            #     interpolated_df = pd.DataFrame({'Date': all_dates, 'DateNum': date_num_all})
+
+            #     # Interpolar valores faltantes para cada lote usando RBFInterpolator
+            #     for column in pivot_df.columns:
+            #         if column not in ['Date', 'DateNum']:
+            #             # Filtrar valores nulos y preparar datos para la interpolación
+            #             x = pivot_df.loc[pivot_df[column].notna(), 'DateNum']
+            #             y = pivot_df.loc[pivot_df[column].notna(), column]
+
+            #             if x.empty or y.empty:
+            #                 print(f"No hay datos para interpolar en la columna: {column}")
+            #                 continue
+
+            #             # Crear el interpolador RBF
+            #             rbf = RBFInterpolator(x.values[:, None], y.values, kernel='thin_plate_spline')
+
+            #             # Interpolar valores para todas las fechas en interpolated_df
+            #             y_interp = rbf(date_num_all.values[:, None])
+
+            #             # Almacenar resultados interpolados en el DataFrame
+            #             interpolated_df[column] = y_interp
+
+            #     # DataFrame de resultados interpolados antes del filtrado por fecha
+            #     datos_interpolados = interpolated_df.copy()
+
+            #     # Filtrar interpolated_df para que solo incluya datos dentro del intervalo START_DATE y END_DATE
+            #     start_date = filtered_df['START_DATE'].min()
+            #     end_date = filtered_df['END_DATE'].max()
+            #     interpolated_df = interpolated_df[(interpolated_df['Date'] >= start_date) & (interpolated_df['Date'] <= end_date)]
+
+            #     # Eliminar la columna 'DateNum' del DataFrame interpolado
+            #     interpolated_df.drop(columns=['DateNum'], inplace=True)
+
+            #     interpolated_df.reset_index(drop=True, inplace=True)
+            #     interpolated_df.index += 1
