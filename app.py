@@ -396,12 +396,22 @@ def main_app(user_info):
 
             # Muestra el selector de rango de fechas
             #st.write(translate("select_date_range", lang))
-            selected_date_range = st.date_input(
-                translate("select_date_range", lang),
-                value=(default_start.date(), default_end.date()),
-                min_value=min_date.date(),
-                max_value=max_date.date()
-            )
+            # selected_date_range = date_range_picker(
+            #     translate("select_date_range", lang),
+            #     value=(default_start.date(), default_end.date()),
+            #     min_value=min_date.date(),
+            #     max_value=max_date.date()
+            # )
+
+            # Asumiendo que `translate`, `default_start`, `default_end`, `min_date` y `max_date` están definidos
+            selected_date_range = date_range_picker(
+                title=translate("select_date_range", lang),
+                default_start=default_start.date(),
+                default_end=default_end.date(),
+                min_date=min_date.date(),
+                max_date=max_date.date(),
+                error_message=translate("error_message_date_picker",lang)  # Puedes ajustar este mensaje si lo deseas
+)
 
             # Validar el rango de fechas seleccionado
             start_date, end_date = selected_date_range
@@ -410,26 +420,15 @@ def main_app(user_info):
                 st.error("La fecha de inicio no puede ser posterior a la fecha de fin.")
             elif (end_date - start_date).days > 240:
                 st.error("El rango máximo permitido es de 240 días.")
+            elif (end_date - start_date).days < 5:
+                raise KeyError("El rango mínimo permitido entre dos fechas es de 5 días.")
             else:
                 # Asignar las fechas seleccionadas a todas las filas de las columnas START_DATE y END_DATE
                 filtered_df = filtered_df.assign(
                     START_DATE=start_date,
                     END_DATE=end_date
                 )
-            ###########################################################################
-            #Tipo de limpieza
-            ###########################################################################   
             
-            # Configuración de las opciones
-            options = [translate('cleaning_option',lang), translate('raw_data_option',lang)]
-            default_option = translate('cleaning_option',lang)
-
-            # Crear un contenedor
-            container = st.container()
-
-            # Agregar el selector al contenedor
-            with container:
-                selected_option = st.radio(translate('choose_option',lang), options, index=options.index(default_option))
             ############################################################################
             # Powered by GeoAgro Picture
             ############################################################################
@@ -533,14 +532,11 @@ def main_app(user_info):
             ############################################################################
             # NDVI
             ############################################################################
-
             
             ###PARALELIZADO
             
             from concurrent.futures import ThreadPoolExecutor
             from scipy.signal import savgol_filter
-
-                  
 
             final_df_list = []
             filtered_df['START_DATE'] = pd.to_datetime(filtered_df['START_DATE'])
@@ -604,6 +600,8 @@ def main_app(user_info):
                 #######################################################################
                 #Solo filtro ESA + interpolacion
 
+                
+
                 # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
                 min_date = pivot_esa['Date'].min()
                 max_date = pivot_esa['Date'].max()
@@ -613,8 +611,14 @@ def main_app(user_info):
                 pivot_esa['DateNum'] = (pivot_esa['Date'] - min_date) / np.timedelta64(1, 'D')
                 date_num_all = (all_dates - min_date) / np.timedelta64(1, 'D')
 
+                
+
                 # Preparar un nuevo DataFrame para almacenar resultados interpolados
                 interpolated_df_esa = pd.DataFrame({'Date': all_dates, 'DateNum': date_num_all})
+
+                
+                # Crear una copia del DataFrame original para asegurarse de que los valores originales no se modifiquen
+                #interpolated_df_esa = pivot_esa.copy()
 
                 # Interpolar valores faltantes para cada lote usando RBFInterpolator
                 for column in pivot_esa.columns:
@@ -650,13 +654,13 @@ def main_app(user_info):
                 #######################################################################
                 #Savitzky–Golay 
 
-                # Aplicar filtro de Savitzky–Golay para cada columna
-                window_size = 20  # Tamaño de la ventana (debe ser un número impar)
-                poly_order = 5    # Orden del polinomio
+                window_size = 15  # Asegurarse de que el tamaño de la ventana sea un número impar
+                poly_order = 3 # Orden del polinomio
 
+                #Aplicar filtro de Savitzky-Golay para cada columna numérica
                 for column in pivot_sg.columns:
                     if column not in ['Date']:
-                        # Aplicar el filtro de Savitzky–Golay
+                        # Aplicar el filtro de Savitzky-Golay
                         pivot_sg[column] = savgol_filter(pivot_sg[column].interpolate(), window_length=window_size, polyorder=poly_order)
 
                 # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
@@ -671,7 +675,7 @@ def main_app(user_info):
                 # Preparar un nuevo DataFrame para almacenar resultados interpolados
                 interpolated_df_sg = pd.DataFrame({'Date': all_dates, 'DateNum': date_num_all})
 
-                # Interpolar valores faltantes para cada lote usando RBFInterpolator
+                # Interpolar valores faltantes para cada columna numérica usando RBFInterpolator
                 for column in pivot_sg.columns:
                     if column not in ['Date', 'DateNum']:
                         # Filtrar valores nulos y preparar datos para la interpolación
@@ -691,7 +695,7 @@ def main_app(user_info):
                         # Almacenar resultados interpolados en el DataFrame
                         interpolated_df_sg[column] = y_interp
 
-                # Filtrar interpolated_df para que solo incluya datos dentro del intervalo START_DATE y END_DATE
+                # Filtrar interpolated_df_sg para que solo incluya datos dentro del intervalo START_DATE y END_DATE
                 start_date = filtered_df['START_DATE'].min()
                 end_date = filtered_df['END_DATE'].max()
                 interpolated_df_sg = interpolated_df_sg[(interpolated_df_sg['Date'] >= start_date) & (interpolated_df_sg['Date'] <= end_date)]
@@ -699,8 +703,8 @@ def main_app(user_info):
                 # Eliminar la columna 'DateNum' del DataFrame interpolado
                 interpolated_df_sg.drop(columns=['DateNum'], inplace=True)
 
+                # Reiniciar índice y ajustar si es necesario
                 interpolated_df_sg.reset_index(drop=True, inplace=True)
-                interpolated_df_sg.index += 1
 
                 ############################################################################
                 #COLORES Y ORDEN DE LOS LOTES
@@ -742,7 +746,6 @@ def main_app(user_info):
                     )])
                     
                     return fig
-
                 
 
                 ############################################################################
@@ -815,32 +818,7 @@ def main_app(user_info):
                     translations['hybrid'], translations['crop_date'], translations['hectares'], translations['color_html']
                 ]), unsafe_allow_html=True)
 
-                ##ORIGINAL
-                # st.dataframe(df_lotes_seleccionados,
-                #             column_config={
-                #                 "area_id": None, #El valor None hace referencia a no mostrar la columna
-                #                 "workspace_id": None,
-                #                 "season_id": None,
-                #                 "farm_id": None,
-                #                 "field_id": None,
-                #                 "geom": None,
-                #                 "centroid": None,
-                #                 "start_date": None,
-                #                 "end_date": None,
-                #                 "START_DATE": None,
-                #                 "END_DATE": None,
-                #                 "area_name": translate('area', lang), #Traducir a paritir del diccionario
-                #                 "workspace_name": translate('workspace', lang),
-                #                 "season_name": translate('season', lang),
-                #                 "farm_name": translate('farm', lang),
-                #                 "field_name": translate('field', lang),
-                #                 "crop": translate('crop', lang),
-                #                 "hybrid": translate('hybrid_varieties', lang),
-                #                 "crop_date": translate('seeding_date', lang), #Revisar si crop date hace referencia a FS
-                #                 "hectares": translate('hectares', lang)                        
-                #             },
-                #             width=100000) #Ancho del cuadro
-                
+                                
                 ############################################################################
                 
                 # MAPA
@@ -977,11 +955,7 @@ def main_app(user_info):
                     st.dataframe(interpolated_df_sg,                        
                                 width=100000)
                 
-                # from streamlit_extras.dataframe_explorer import dataframe_explorer #DF que permite hacer filtrado
-
-                # ndvi_df = dataframe_explorer(interpolated_df2, case=False)
-                # st.dataframe(ndvi_df, use_container_width=True)
-                
+                                
                 ############################################################################
 
                 #SERIE TEMPORAL NDVI
@@ -1098,16 +1072,47 @@ def main_app(user_info):
 
                         st.plotly_chart(fig, use_container_width=True)
     
-                ############################################################################
+                ###########################################################################
+                #Tipo de limpieza
+                ###########################################################################   
+                from streamlit_extras.stylable_container import stylable_container
 
-                # Asignar el DataFrame según la opción seleccionada
-                if selected_option == translate('cleaning_option',lang):
-                    interpolated_df = interpolated_df_sg
-                else:
-                    interpolated_df = interpolated_df_esa
+                st.markdown('')
+                st.markdown('')
+                st.write(translate('cleaning_option', lang))
 
-                interpolated_df.drop('PROMEDIO', axis=1, inplace=True)
+                with stylable_container(
+                        key="container_with_border",
+                        css_styles="""
+                            {
+                                border: 0.5px solid rgba(49, 51, 63, 0.2);
+                                border-radius: 0.5rem;
+                                padding: calc(1em - 1px)
+                            }
+                            """,
+                    ):
+                        st.markdown('El siguiente selector brinda la posibilidad de decidir si las proximas visualizaciones se realizan a partir de los datos sin procesar, o de los datos filtrados con el método Savitzky-Golay')
 
+                    # Configuración de las opciones
+                options = [translate('cleaning_option',lang), translate('raw_data_option',lang)]
+                default_option = translate('cleaning_option',lang)
+
+                # Crear un contenedor
+                container = st.container()
+
+                # Agregar el selector al contenedor
+                with container:
+                    selected_option = st.selectbox(translate('choose_option',lang), options, index=options.index(default_option))
+
+                    # Asignar el DataFrame según la opción seleccionada
+                    if selected_option == translate('cleaning_option',lang):
+                        interpolated_df = interpolated_df_sg
+                    else:
+                        interpolated_df = interpolated_df_esa
+
+                    interpolated_df.drop('PROMEDIO', axis=1, inplace=True)
+
+                ###########################################################################   
                 #HEATMAP
 
                 st.markdown('')
@@ -1139,6 +1144,9 @@ def main_app(user_info):
                     [1.0, 'rgb(51, 67, 178)'],     # 3343b2 - Azul oscuro
                 ]
 
+                # Calcular la altura del gráfico
+                altura_grafico = len(interpolated_df.columns[1:]) * 55
+
                 # Obtener los valores de las columnas de lotes (excluyendo la columna 'Date')
                 lotes_values = interpolated_df.drop(columns='Date').values
 
@@ -1164,7 +1172,7 @@ def main_app(user_info):
                     xaxis_title= translate("date2", lang),
                     yaxis_title= translate("field", lang),
                     autosize = True,
-                    height=650)
+                    height=altura_grafico)
                 
                 fig.update_traces(
                     hovertemplate=f'<b>{translate("date2", lang)}:</b> %{{x}}<br><b>{translate("field", lang)}:</b> {column}<br><b>NDVI:</b> %{{z}}<extra></extra>' #Traducir variables del cuadro interactivo
@@ -1376,6 +1384,8 @@ def main_app(user_info):
 
                 ############################################################################
                 #GRAFICA SD Y CV
+
+                st.write(translate('cv_rank',lang))
                 
                 # Crear la figura
                 fig = go.Figure()
@@ -1401,8 +1411,7 @@ def main_app(user_info):
 
                 # Actualizar las configuraciones del layout para incluir dos ejes Y
                 fig.update_layout(
-                    title=translate('cv_rank', lang),
-                    xaxis=dict(
+                        xaxis=dict(
                         title=translate('field', lang),
                         tickfont_size=14,
                         tickangle=-45

@@ -493,3 +493,156 @@
 
             #     interpolated_df.reset_index(drop=True, inplace=True)
             #     interpolated_df.index += 1
+
+            ############################################################################
+                # TABLA RESUMEN LOTES
+                ##ORIGINAL
+                # st.dataframe(df_lotes_seleccionados,
+                #             column_config={
+                #                 "area_id": None, #El valor None hace referencia a no mostrar la columna
+                #                 "workspace_id": None,
+                #                 "season_id": None,
+                #                 "farm_id": None,
+                #                 "field_id": None,
+                #                 "geom": None,
+                #                 "centroid": None,
+                #                 "start_date": None,
+                #                 "end_date": None,
+                #                 "START_DATE": None,
+                #                 "END_DATE": None,
+                #                 "area_name": translate('area', lang), #Traducir a paritir del diccionario
+                #                 "workspace_name": translate('workspace', lang),
+                #                 "season_name": translate('season', lang),
+                #                 "farm_name": translate('farm', lang),
+                #                 "field_name": translate('field', lang),
+                #                 "crop": translate('crop', lang),
+                #                 "hybrid": translate('hybrid_varieties', lang),
+                #                 "crop_date": translate('seeding_date', lang), #Revisar si crop date hace referencia a FS
+                #                 "hectares": translate('hectares', lang)                        
+                #             },
+                #             width=100000) #Ancho del cuadro
+
+
+            ###########################################################################
+            #Tipo de limpieza
+            ###########################################################################   
+            
+            # # Configuración de las opciones
+            # options = [translate('cleaning_option',lang), translate('raw_data_option',lang)]
+            # default_option = translate('cleaning_option',lang)
+
+            # # Crear un contenedor
+            # container = st.container()
+
+            # # Agregar el selector al contenedor
+            # with container:
+            #     selected_option = st.selectbox(translate('choose_option',lang), options, index=options.index(default_option))
+
+
+            ##########################################################################  
+            ##########################################################################  
+
+            #ULTIMOS METODOS DE LIMPIEZA ANTES DE CAMBIARLOS POR LOS DE LIMPIEZA.PY
+
+            #ESA + INTERPOLACION
+
+            # # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
+                # min_date = pivot_esa['Date'].min()
+                # max_date = pivot_esa['Date'].max()
+                # all_dates = pd.date_range(start=min_date, end=max_date, freq='D')
+
+                # # Convertir fechas a un formato numérico (número de días desde la primera fecha)
+                # pivot_esa['DateNum'] = (pivot_esa['Date'] - min_date) / np.timedelta64(1, 'D')
+                # date_num_all = (all_dates - min_date) / np.timedelta64(1, 'D')
+
+                # # Preparar un nuevo DataFrame para almacenar resultados interpolados
+                # interpolated_df_esa = pd.DataFrame({'Date': all_dates, 'DateNum': date_num_all})
+
+                # # Interpolar valores faltantes para cada lote usando RBFInterpolator
+                # for column in pivot_esa.columns:
+                #     if column not in ['Date', 'DateNum']:
+                #         # Filtrar valores nulos y preparar datos para la interpolación
+                #         x = pivot_esa.loc[pivot_esa[column].notna(), 'DateNum']
+                #         y = pivot_esa.loc[pivot_esa[column].notna(), column]
+
+                #         if x.empty or y.empty:
+                #             print(f"No hay datos para interpolar en la columna: {column}")
+                #             continue
+
+                #         # Crear el interpolador RBF
+                #         rbf = RBFInterpolator(x.values[:, None], y.values, kernel='thin_plate_spline')
+
+                #         # Interpolar valores para todas las fechas en interpolated_df
+                #         y_interp = rbf(date_num_all.values[:, None])
+
+                #         # Almacenar resultados interpolados en el DataFrame
+                #         interpolated_df_esa[column] = y_interp
+
+                # # Filtrar interpolated_df para que solo incluya datos dentro del intervalo START_DATE y END_DATE
+                # start_date = filtered_df['START_DATE'].min()
+                # end_date = filtered_df['END_DATE'].max()
+                # interpolated_df_esa = interpolated_df_esa[(interpolated_df_esa['Date'] >= start_date) & (interpolated_df_esa['Date'] <= end_date)]
+
+                # # Eliminar la columna 'DateNum' del DataFrame interpolado
+                # interpolated_df_esa.drop(columns=['DateNum'], inplace=True)
+
+                # interpolated_df_esa.reset_index(drop=True, inplace=True)
+                # interpolated_df_esa.index += 1
+
+            #SG
+
+            # # Aplicar filtro de Savitzky–Golay para cada columna
+                # window_size = 15  # Tamaño de la ventana (debe ser un número impar)
+                # poly_order = 3    # Orden del polinomio
+
+                # for column in pivot_sg.columns:
+                #     if column not in ['Date']:
+                #         # Aplicar el filtro de Savitzky–Golay
+                #         pivot_sg[column] = savgol_filter(pivot_sg[column].interpolate(), window_length=window_size, polyorder=poly_order)
+
+                # # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
+                # min_date = pivot_sg['Date'].min()
+                # max_date = pivot_sg['Date'].max()
+                # all_dates = pd.date_range(start=min_date, end=max_date, freq='D')
+
+                # # Convertir fechas a un formato numérico (número de días desde la primera fecha)
+                # pivot_sg['DateNum'] = (pivot_sg['Date'] - min_date) / np.timedelta64(1, 'D')
+                # date_num_all = (all_dates - min_date) / np.timedelta64(1, 'D')
+
+                # # Preparar un nuevo DataFrame para almacenar resultados interpolados
+                # interpolated_df_sg = pd.DataFrame({'Date': all_dates, 'DateNum': date_num_all})
+
+                # # Interpolar valores faltantes para cada lote usando RBFInterpolator
+                # for column in pivot_sg.columns:
+                #     if column not in ['Date', 'DateNum']:
+                #         # Filtrar valores nulos y preparar datos para la interpolación
+                #         x = pivot_sg.loc[pivot_sg[column].notna(), 'DateNum']
+                #         y = pivot_sg.loc[pivot_sg[column].notna(), column]
+
+                #         if x.empty or y.empty:
+                #             print(f"No hay datos para interpolar en la columna: {column}")
+                #             continue
+
+                #         # Crear el interpolador RBF
+                #         rbf = RBFInterpolator(x.values[:, None], y.values, kernel='thin_plate_spline')
+
+                #         # Interpolar valores para todas las fechas en interpolated_df
+                #         y_interp = rbf(date_num_all.values[:, None])
+
+                #         # Almacenar resultados interpolados en el DataFrame
+                #         interpolated_df_sg[column] = y_interp
+
+                # # Filtrar interpolated_df para que solo incluya datos dentro del intervalo START_DATE y END_DATE
+                # start_date = filtered_df['START_DATE'].min()
+                # end_date = filtered_df['END_DATE'].max()
+                # interpolated_df_sg = interpolated_df_sg[(interpolated_df_sg['Date'] >= start_date) & (interpolated_df_sg['Date'] <= end_date)]
+
+                # # Eliminar la columna 'DateNum' del DataFrame interpolado
+                # interpolated_df_sg.drop(columns=['DateNum'], inplace=True)
+
+                # interpolated_df_sg.reset_index(drop=True, inplace=True)
+                # interpolated_df_sg.index += 1
+
+                # Aplicar filtro de Savitzky-Golay para cada columna
+                # Configuración del filtro de Savitzky-Golay
+
