@@ -47,6 +47,25 @@ import logging
 # Manejo de Fechas
 from datetime import datetime, timedelta
 
+#import requests
+from concurrent.futures import ThreadPoolExecutor #Paralelizado
+from scipy.signal import savgol_filter
+
+from functools import wraps
+import time
+def timeit(func):
+    # Decorador para calcular el tiempo de ejecución de una función
+    @wraps(func)
+    def timeit_wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        print(
+            f'Function {func.__name__} took {total_time:.4f} seconds')
+        return result
+    return timeit_wrapper
+
 ############################################################################
 # Estilo
 ############################################################################
@@ -270,11 +289,12 @@ def main_app(user_info):
             cultivos = sorted(filtered_df['crop'].unique().tolist())
 
             container = st.container()
-            select_all_cultivos = st.toggle(translate("select_all", lang), value=True, key='select_all_cultivos')
+            select_all_cultivos = st.toggle(translate("select_all", lang), value=False, key='select_all_cultivos')
 
             if select_all_cultivos:
                 selector_cultivos = container.multiselect(
                     translate("crop", lang),
+                    cultivos,
                     cultivos)  # Todos los cultivos están seleccionados por defecto
             else:
                 selector_cultivos = container.multiselect(
@@ -293,7 +313,7 @@ def main_app(user_info):
             hibrido = sorted(filtered_df['hybrid'].unique().tolist())
 
             container = st.container()
-            select_all_hibrido = st.toggle(translate("select_all", lang), value=True, key='select_all_hibrido')
+            select_all_hibrido = st.toggle(translate("select_all", lang), value=False, key='select_all_hibrido')
 
             if select_all_hibrido:
                 selector_hibrido = container.multiselect(
@@ -317,7 +337,7 @@ def main_app(user_info):
             fields = sorted(filtered_df['field_name'].unique().tolist())
 
             container = st.container()
-            select_all_fields = st.toggle(translate("select_all", lang), value=True, key='select_all_fields')
+            select_all_fields = st.toggle(translate("select_all", lang), value=False, key='select_all_fields')
 
             if select_all_fields:
                 selector_fields = container.multiselect(
@@ -393,25 +413,39 @@ def main_app(user_info):
                 default_end = min_date
             if default_end > max_date:
                 default_end = max_date
-
-            # Muestra el selector de rango de fechas
-            #st.write(translate("select_date_range", lang))
+            
+            # # Asumiendo que `translate`, `default_start`, `default_end`, `min_date` y `max_date` están definidos
             # selected_date_range = date_range_picker(
-            #     translate("select_date_range", lang),
-            #     value=(default_start.date(), default_end.date()),
-            #     min_value=min_date.date(),
-            #     max_value=max_date.date()
+            #     title=translate("select_date_range", lang),
+            #     default_start=default_start.date(),
+            #     default_end=default_end.date(),
+            #     min_date=min_date.date(),
+            #     max_date=max_date.date(),
+            #     error_message=translate("error_message_date_picker",lang)  # Puedes ajustar este mensaje si lo deseas
             # )
 
-            # Asumiendo que `translate`, `default_start`, `default_end`, `min_date` y `max_date` están definidos
-            selected_date_range = date_range_picker(
-                title=translate("select_date_range", lang),
-                default_start=default_start.date(),
-                default_end=default_end.date(),
-                min_date=min_date.date(),
-                max_date=max_date.date(),
-                error_message=translate("error_message_date_picker",lang)  # Puedes ajustar este mensaje si lo deseas
-)
+            # Crear un selector para la fecha de inicio
+            start_date = st.date_input(
+                label=translate('start_date', lang),
+                value=default_start.date(),
+                min_value=min_date.date(),
+                max_value=max_date.date()
+            )
+
+            # Crear un selector para la fecha de fin
+            end_date = st.date_input(
+                label=translate('end_date', lang),
+                value=default_end.date(),
+                min_value=min_date.date(),
+                max_value=max_date.date()
+            )
+
+            # Validar las fechas seleccionadas
+            if start_date > end_date:
+                st.error(translate("error_message_date_picker", lang))
+            else:
+                selected_date_range = (start_date, end_date)
+                
 
             # Validar el rango de fechas seleccionado
             start_date, end_date = selected_date_range
@@ -428,7 +462,50 @@ def main_app(user_info):
                     START_DATE=start_date,
                     END_DATE=end_date
                 )
-            
+
+            ###########################################################################
+            #Tipo de limpieza
+            ###########################################################################   
+                        
+            # # Configuración de las opciones
+            # cleaning_option = translate('cleaning_option', lang)
+            # raw_data_option = translate('raw_data_option', lang)
+
+            # # Crear un contenedor
+            # container = st.container()
+
+            # # Agregar el toggle al contenedor
+            # with container:
+            #     # El valor por defecto es True para seleccionar cleaning_option
+            #     toggle_value = st.toggle('Limpieza estadistica activa', value=True)
+
+            # # Mapeo del valor del toggle a las opciones
+            # selected_option = cleaning_option if toggle_value else raw_data_option
+
+            # Configuración de las opciones
+            cleaning_option = translate('cleaning_option', lang)  # "Limpieza estadística"
+            raw_data_option = translate('raw_data_option', lang)  # "Datos crudos"
+
+            # Crear un contenedor
+            container = st.container()
+
+            # Agregar el toggle al contenedor
+            with container:
+                col1, col2 = st.columns([4, 1])  # Ajustar la proporción de las columnas según sea necesario
+
+                with col1:
+                    st.write("Tipo de Limpieza de Datos")
+
+                with col2:
+                    toggle_value = st.toggle("", value=True)
+
+                
+
+            # Mapeo del valor del toggle a las opciones
+            selected_option = cleaning_option if toggle_value else raw_data_option
+
+            st.write(f"Opción seleccionada: {selected_option}")
+        
             ############################################################################
             # Powered by GeoAgro Picture
             ############################################################################
@@ -456,6 +533,8 @@ def main_app(user_info):
             with cI3:
                 pass
             ############################################################################
+
+        #st.dataframe(filtered_df)
         # Verifica si no hay lotes seleccionados
         if filtered_df.empty:
             st.warning(translate('select_warning',lang))
@@ -533,17 +612,16 @@ def main_app(user_info):
             # NDVI
             ############################################################################
             
-            ###PARALELIZADO
+            ###PARALELIZADO          
             
-            from concurrent.futures import ThreadPoolExecutor
-            from scipy.signal import savgol_filter
-
             final_df_list = []
             filtered_df['START_DATE'] = pd.to_datetime(filtered_df['START_DATE'])
             filtered_df['END_DATE'] = pd.to_datetime(filtered_df['END_DATE'])
 
             # Definir una función para procesar un índice dado y llamar a extract_mean_ndvi_date
-            def process_index(index, row, days_before_start, days_after_end):
+            @timeit
+            @st.cache_data(show_spinner=False)
+            def get_cached_index_data(index, row, days_before_start, days_after_end):
                 lote_gdf_filtrado = pd.DataFrame([row])
                 extended_start_date = row['START_DATE'] - timedelta(days=days_before_start)
                 extended_end_date = row['END_DATE'] + timedelta(days=days_after_end)
@@ -567,23 +645,26 @@ def main_app(user_info):
 
                 return df_temp
 
+            def process_index(index, row, days_before_start, days_after_end):
+                return get_cached_index_data(index, row, days_before_start, days_after_end)
+
+            # Parámetros
             days_before_start = 30
             days_after_end = 30
 
-            with ThreadPoolExecutor() as executor:
-                futures = [executor.submit(process_index, index, row, days_before_start, days_after_end)
-                        for index, row in filtered_df.iterrows()]
-
-                for future in futures:
-                    result = future.result()
-                    if result is not None and not result.empty:
-                        final_df_list.append(result)
+            for index, row in filtered_df.iterrows():
+                result = process_index(index, row, days_before_start, days_after_end)
+                if result is not None and not result.empty:
+                    final_df_list.append(result)
 
             if final_df_list:
                 final_df = pd.concat(final_df_list, ignore_index=True)
             else:
                 st.error("No se encontraron datos NDVI para ninguna geometría.")
                 final_df = pd.DataFrame()
+
+            # Almacenar el resultado en st.session_state si es necesario
+            st.session_state['final_ndvi_data'] = final_df
 
             # Continuar solo si final_df no está vacío
             if not final_df.empty:
@@ -598,9 +679,7 @@ def main_app(user_info):
                 pivot_sg=pivot_df
 
                 #######################################################################
-                #Solo filtro ESA + interpolacion
-
-                
+                #Solo filtro ESA + interpolacion                
 
                 # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
                 min_date = pivot_esa['Date'].min()
@@ -707,11 +786,60 @@ def main_app(user_info):
                 interpolated_df_sg.reset_index(drop=True, inplace=True)
 
                 ############################################################################
+                #CALCULO DE RANKING 
+                ############################################################################
+                
+                # Asignar interpolated_df basado en la opción seleccionada
+                if selected_option == translate('cleaning_option', lang):
+                    interpolated_df = interpolated_df_sg
+                elif selected_option == translate('raw_data_option', lang):
+                    interpolated_df = interpolated_df_esa       
+
+                interpolated_df['Date'] = pd.to_datetime(interpolated_df['Date'])
+                pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
+
+                # Calcular la integral de la serie temporal NDVI para cada lote usando las fechas directamente
+                integrals = {}
+                for column in interpolated_df.columns:
+                    if column not in ['Date']:
+                        # Convertir las fechas a un formato numérico relativo para la integración
+                        dates_numeric = (interpolated_df['Date'] - interpolated_df['Date'].min()).dt.days
+                        integrals[column] = trapz(interpolated_df[column], dates_numeric)
+
+                # Calcular la media y el desvío estándar para cada lote
+                means = pivot_df.drop(columns=['Date']).mean()
+                std_devs = pivot_df.drop(columns=['Date']).std()
+
+                # Calcular el Coeficiente de Variación (CV) en porcentaje
+                cvs = (std_devs / means) * 100
+
+                # Asegurarse de que todos los lotes están presentes en ambas listas
+                all_lots = set(integrals.keys()).union(set(std_devs.index))
+                integral_values = [integrals.get(lot, np.nan) for lot in all_lots]
+                std_dev_values = [std_devs.get(lot, np.nan) for lot in all_lots]
+                cv_values = [cvs.get(lot, np.nan) for lot in all_lots]
+
+                # Crear DataFrame para los rankings
+                ranking_df = pd.DataFrame({
+                    'Lote': list(all_lots),
+                    'Integral_NDVI': integral_values,
+                    'Desvio_Estandar': std_dev_values,
+                    'CV_%': cv_values
+                })
+
+                # Ordenar por Integral de NDVI
+                ranking_integral = ranking_df.sort_values(by='Integral_NDVI', ascending=False).reset_index(drop=True)
+                # Ordenar por Desvío Estándar
+                ranking_desvio = ranking_df.sort_values(by='Desvio_Estandar', ascending=False).reset_index(drop=True)
+                # Ordenar por Coeficiente de Variación
+                ranking_cv = ranking_df.sort_values(by='CV_%', ascending=False).reset_index(drop=True)
+
+                ############################################################################
                 #COLORES Y ORDEN DE LOS LOTES
                 ############################################################################
-
-                # Obtener la lista de lotes únicos y asignar colores
-                lotes = sorted(filtered_df['field_name'].unique().tolist())
+                
+                # Obtener la lista de lotes en el orden de ranking_integral
+                lotes = ranking_integral['Lote'].tolist()
                 selected_colors = px.colors.qualitative.T10
 
                 # Crear un diccionario para asignar colores a cada lote
@@ -895,13 +1023,9 @@ def main_app(user_info):
                 Map.to_streamlit()
 
                 ############################################################################
-                
                 st.divider()
                 st.markdown('')
-                ##################################################################################################
-            
-                ############################################################################
-                
+
                 # Mostrar la tabla con los datos finales NDVI interpolados
 
                 st.markdown(f"<b>{translate('ndvi_results', lang)}</b>", unsafe_allow_html=True)
@@ -964,7 +1088,7 @@ def main_app(user_info):
                 st.markdown('')
                 st.write(translate('ndvi_serie', lang))
 
-                tab1, tab2 = st.tabs(["Crudo", "Savitzky–Golay "])
+                tab1, tab2= st.tabs(["Crudo", "Savitzky–Golay "])
 
                 with tab1:
 
@@ -1071,53 +1195,16 @@ def main_app(user_info):
                             )
 
                         st.plotly_chart(fig, use_container_width=True)
-    
-                ###########################################################################
-                #Tipo de limpieza
-                ###########################################################################   
-                from streamlit_extras.stylable_container import stylable_container
-
-                st.markdown('')
-                st.markdown('')
-                st.write(translate('cleaning_option', lang))
-
-                with stylable_container(
-                        key="container_with_border",
-                        css_styles="""
-                            {
-                                border: 0.5px solid rgba(49, 51, 63, 0.2);
-                                border-radius: 0.5rem;
-                                padding: calc(1em - 1px)
-                            }
-                            """,
-                    ):
-                        st.markdown('El siguiente selector brinda la posibilidad de decidir si las proximas visualizaciones se realizan a partir de los datos sin procesar, o de los datos filtrados con el método Savitzky-Golay')
-
-                    # Configuración de las opciones
-                options = [translate('cleaning_option',lang), translate('raw_data_option',lang)]
-                default_option = translate('cleaning_option',lang)
-
-                # Crear un contenedor
-                container = st.container()
-
-                # Agregar el selector al contenedor
-                with container:
-                    selected_option = st.selectbox(translate('choose_option',lang), options, index=options.index(default_option))
-
-                    # Asignar el DataFrame según la opción seleccionada
-                    if selected_option == translate('cleaning_option',lang):
-                        interpolated_df = interpolated_df_sg
-                    else:
-                        interpolated_df = interpolated_df_esa
-
-                    interpolated_df.drop('PROMEDIO', axis=1, inplace=True)
-
+                    
                 ###########################################################################   
                 #HEATMAP
 
                 st.markdown('')
                 st.markdown('')
                 st.write(translate('ndvi_heatmap', lang))
+
+                
+                interpolated_df.drop('PROMEDIO', axis=1, inplace=True)
 
                 # Definir la paleta de colores personalizada basada en la imagen proporcionada
                 custom_colorscale = [
@@ -1145,7 +1232,7 @@ def main_app(user_info):
                 ]
 
                 # Calcular la altura del gráfico
-                altura_grafico = len(interpolated_df.columns[1:]) * 55
+                #altura_grafico = len(interpolated_df.columns[1:]) * 55
 
                 # Obtener los valores de las columnas de lotes (excluyendo la columna 'Date')
                 lotes_values = interpolated_df.drop(columns='Date').values
@@ -1172,7 +1259,7 @@ def main_app(user_info):
                     xaxis_title= translate("date2", lang),
                     yaxis_title= translate("field", lang),
                     autosize = True,
-                    height=altura_grafico)
+                    height=650)
                 
                 fig.update_traces(
                     hovertemplate=f'<b>{translate("date2", lang)}:</b> %{{x}}<br><b>{translate("field", lang)}:</b> {column}<br><b>NDVI:</b> %{{z}}<extra></extra>' #Traducir variables del cuadro interactivo
@@ -1188,12 +1275,18 @@ def main_app(user_info):
                 st.markdown('')
                 st.markdown('')
                 st.write(translate('ndvi_boxplot', lang))
+
+                # Asumimos que 'ndvi_columns' es una lista de las columnas NDVI en 'interpolated_df'
+                ndvi_columns = interpolated_df.columns.difference(['Date']).tolist()
+
+                # Ordenar los ndvi_columns según el orden en color_map
+                ndvi_columns_sorted = sorted(ndvi_columns, key=lambda x: color_map[x]['order'])
                 
                 # Crear el boxplot horizontal
                 fig = go.Figure()
 
                 # Iterar sobre las columnas de 'interpolated_df' excepto la columna 'Date'
-                for i, column in enumerate(ndvi_columns):
+                for i, column in enumerate(ndvi_columns_sorted):
                     fig.add_trace(go.Box(
                         y=interpolated_df[column],
                         name=column,
@@ -1221,48 +1314,6 @@ def main_app(user_info):
                 st.divider()
                 st.markdown('')
                 
-                interpolated_df['Date'] = pd.to_datetime(interpolated_df['Date'])
-                pivot_df['Date'] = pd.to_datetime(pivot_df['Date'])
-
-                # Calcular la integral de la serie temporal NDVI para cada lote usando las fechas directamente
-                integrals = {}
-                for column in interpolated_df.columns:
-                    if column not in ['Date']:
-                        # Convertir las fechas a un formato numérico relativo para la integración
-                        dates_numeric = (interpolated_df['Date'] - interpolated_df['Date'].min()).dt.days
-                        integrals[column] = trapz(interpolated_df[column], dates_numeric)
-
-                # Calcular la media y el desvío estándar para cada lote
-                means = pivot_df.drop(columns=['Date']).mean()
-                std_devs = pivot_df.drop(columns=['Date']).std()
-
-                # Calcular el Coeficiente de Variación (CV) en porcentaje
-                cvs = (std_devs / means) * 100
-
-                # Asegurarse de que todos los lotes están presentes en ambas listas
-                all_lots = set(integrals.keys()).union(set(std_devs.index))
-                integral_values = [integrals.get(lot, np.nan) for lot in all_lots]
-                std_dev_values = [std_devs.get(lot, np.nan) for lot in all_lots]
-                cv_values = [cvs.get(lot, np.nan) for lot in all_lots]
-
-                # Crear DataFrame para los rankings
-                ranking_df = pd.DataFrame({
-                    'Lote': list(all_lots),
-                    'Integral_NDVI': integral_values,
-                    'Desvio_Estandar': std_dev_values,
-                    'CV_%': cv_values
-                })
-
-                # Ordenar por Integral de NDVI
-                ranking_integral = ranking_df.sort_values(by='Integral_NDVI', ascending=False).reset_index(drop=True)
-                # Ordenar por Desvío Estándar
-                ranking_desvio = ranking_df.sort_values(by='Desvio_Estandar', ascending=False).reset_index(drop=True)
-                # Ordenar por Coeficiente de Variación
-                ranking_cv = ranking_df.sort_values(by='CV_%', ascending=False).reset_index(drop=True)
-
-                
-                ############################################################################
-
                 #GRAFICOS DE RANKING
 
                 # Verificar si 'DateNum' está presente como el primer elemento en la lista de lotes
@@ -1293,166 +1344,51 @@ def main_app(user_info):
 
                 # Ordenar el DataFrame por la columna 'Lote'
                 ranking_df2 = ranking_df2.sort_values(by='Lote').reset_index(drop=True)
+                
+                # Encuentra el índice de la fila 'DateNum'
+                index_to_drop = ranking_df2[ranking_df2['Lote'] == 'DateNum'].index
 
+                # Elimina la fila por su índice
+                ranking_df2.drop(index_to_drop, inplace=True)
+                
                 lotes = ranking_df2['Lote'].unique()
 
                 ############################################################################
                 #GRAFICA DE INTEGRAL
 
                 st.markdown(translate('ndvi_integral_rank', lang))
-
                 
-                tab1, tab2 = st.tabs(["Ranking", translate("field",lang)])
+                fig_integral2 = create_bar_chart(ranking_df2, 'Integral_NDVI', lotes, color_map2)  # En función del Color_map
 
-                with tab1:
+                fig_integral2.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
+                fig_integral2.update_yaxes(title_text= translate('ndvi_integral', lang))
 
-                    st.markdown('')
-                    st.markdown('')
-                    st.markdown('')
+                fig_integral2.update_traces(
+                    hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_integral", lang)}:</b> %{{y}}<extra></extra>'  # Traducir variables del cuadro interactivo
+                )
+                
+                # Ajustar la altura del gráfico
+                # fig_integral2.update_layout(height=500) 
 
-                # Graficar los rankings con plotly.express
-
-                    fig_integral = px.bar(ranking_integral, x='Lote', y='Integral_NDVI')
-                    fig_integral.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
-                    fig_integral.update_yaxes(title_text= translate('ndvi_integral', lang))
-
-                    
-                    fig_integral.update_traces(
-                        marker_color='#4C78A8',
-                        hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_integral", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
-                        )
-
-                    st.plotly_chart(fig_integral, use_container_width=True)
-
-                with tab2:
-                    
-                    fig_integral2 = create_bar_chart(ranking_df2, 'Integral_NDVI', lotes, color_map2)  # En función del Color_map
-
-                    fig_integral2.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
-                    fig_integral2.update_yaxes(title_text= translate('ndvi_integral', lang))
-
-                    fig_integral2.update_traces(
-                        hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_integral", lang)}:</b> %{{y}}<extra></extra>'  # Traducir variables del cuadro interactivo
-                    )
-                    
-                    # Ajustar la altura del gráfico
-                    # fig_integral2.update_layout(height=500) 
-
-                    st.plotly_chart(fig_integral2, use_container_width=True)
+                st.plotly_chart(fig_integral2, use_container_width=True)
                 ############################################################################
                 #GRAFICA SD
 
                 st.write(translate('ndvi_sd_rank', lang))
+                                
+                fig_desvio2 = create_bar_chart(ranking_desvio, 'Desvio_Estandar', lotes, color_map2) #En funcion del Color_map
 
-                tab1, tab2 = st.tabs(["Ranking", translate("field",lang)])
+                fig_desvio2.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
+                fig_desvio2.update_yaxes(title_text= translate('ndvi_sd', lang))
 
-                with tab1:
-
-                    st.markdown('')
-                    st.markdown('')
-                    st.markdown('')
-
-                # Graficar los rankings con plotly.express
-
-                    fig_desvio = px.bar(ranking_desvio, x='Lote', y='Desvio_Estandar')
-                    fig_desvio.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
-                    fig_desvio.update_yaxes(title_text= translate('ndvi_sd', lang))
-
-                    
-                    fig_desvio.update_traces(
-                        marker_color='#4C78A8',
-                        hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
-                        )
-
-                    st.plotly_chart(fig_desvio, use_container_width=True)
-
-                with tab2:
-                    
-                    fig_desvio2 = create_bar_chart(ranking_df2, 'Desvio_Estandar', lotes, color_map2) #En funcion del Color_map
-
-                    fig_desvio2.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
-                    fig_desvio2.update_yaxes(title_text= translate('ndvi_sd', lang))
-
-                    fig_desvio2.update_traces(
-                        hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
-                        )
-                    
-                    # Ajustar la altura del gráfico
-                    fig_desvio2.update_layout(height=500) 
-
-                    st.plotly_chart(fig_desvio2, use_container_width=True)
-
-                ############################################################################
-                #GRAFICA SD Y CV
-
-                st.write(translate('cv_rank',lang))
+                fig_desvio2.update_traces(
+                    hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
+                    )
                 
-                # Crear la figura
-                fig = go.Figure()
+                # Ajustar la altura del gráfico
+                fig_desvio2.update_layout(height=500) 
 
-                # Añadir las barras del Desvío Estándar
-                fig.add_trace(go.Bar(
-                    x=ranking_desvio['Lote'],
-                    y=ranking_desvio['Desvio_Estandar'],
-                    name=translate('field', lang),
-                    marker=dict(color='#4C78A8'),
-                    yaxis='y1'
-                ))
-
-                # Añadir los puntos del Coeficiente de Variación
-                fig.add_trace(go.Scatter(
-                    x=ranking_cv['Lote'],
-                    y=ranking_cv['CV_%'],
-                    name=translate('cv', lang),
-                    mode='markers',
-                    marker=dict(color='#E45756', size=10),
-                    yaxis='y2'
-                ))
-
-                # Actualizar las configuraciones del layout para incluir dos ejes Y
-                fig.update_layout(
-                        xaxis=dict(
-                        title=translate('field', lang),
-                        tickfont_size=14,
-                        tickangle=-45
-                    ),
-                    yaxis=dict(
-                        title=translate('ndvi_sd', lang),
-                        titlefont_size=16,
-                        tickfont_size=14,
-                        side='left',
-                        range=[0, 1],  # Ajustar el rango del eje y1
-                        showgrid=True
-                    ),
-                    yaxis2=dict(
-                        title=translate('cv', lang),
-                        titlefont_size=16,
-                        tickfont_size=14,
-                        side='right',
-                        overlaying='y',
-                        range=[0, 100],  # Ajustar el rango del eje y2
-                        showgrid=False
-                    ),
-                    legend=dict(
-                        x=0,
-                        y=1.1,
-                        bgcolor='rgba(255, 255, 255, 0)',
-                        bordercolor='rgba(255, 255, 255, 0)'
-                    ),
-                    barmode='group',  # Agrupar las barras una al lado de la otra
-                    bargap=0.15,      # Espacio entre barras de diferentes categorías
-                    bargroupgap=0.1   # Espacio entre barras de la misma categoría
-                )
-
-                # Configurar hovertemplate para todas las trazas
-                fig.update_traces(
-                    hovertemplate=f'<b>{translate("field", lang)}:</b>%{x}<b>{translate("cv", lang)}:</b>%{y}<extra></extra>'
-                )
-
-                
-
-                # Mostrar el gráfico en Streamlit
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig_desvio2, use_container_width=True)
                 
                 
         ############################################################################
@@ -1465,8 +1401,8 @@ def main_app(user_info):
 
 if __name__ == "__main__":
     redirect_uri=" http://localhost:8501"
-    # user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'test', 'domainId': 1, 'areaId': 1, 'workspaceId': 882, 'seasonId': 172, 'farmId': 2016} # TEST / GeoAgro / GeoAgro / TEST_BONELLI / 2021-22 / Lacau SA - Antares
-    user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'prod', 'domainId': 1, 'areaId': 1, 'workspaceId': 65, 'seasonId': 3486, 'farmId': 11143} 
+    user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'test', 'domainId': 1, 'areaId': 1, 'workspaceId': 882, 'seasonId': 172, 'farmId': 2016} # TEST / GeoAgro / GeoAgro / TEST_BONELLI / 2021-22 / Lacau SA - Antares
+    #user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'prod', 'domainId': 1, 'areaId': 1, 'workspaceId': 65, 'seasonId': 3486, 'farmId': 11143} 
     st.session_state['user_info'] = user_info
     main_app(user_info)
 

@@ -90,5 +90,7 @@ translate_dict = {
     'cv_rank': {'en': 'NDVI Standard Deviation and CV Ranking', 'es': 'Ranking por Desvío Estándar y CV de NDVI', 'pt': 'Classificação de Desvio Padrão e CV do NDVI'},
     'colour': {'en': 'Colour', 'es': 'Color', 'pt': 'Cor'},
     'cleaning_option': {'en': 'Statistical Cleaning', 'es': 'Limpieza Estadistica', 'pt': 'Limpeza Estatística'},
-    'raw_data_option': {'en': 'Raw Data', 'es': 'Datos Sin Procesar', 'pt': 'Dados Não Trarados'}
+    'raw_data_option': {'en': 'Raw Data', 'es': 'Datos Sin Procesar', 'pt': 'Dados Não Trarados'},
+    'start_date': {'en': 'Start Date', 'es': 'Fecha de Inicio', 'pt': 'Data de Inicio'},
+    'end_date': {'en': 'End Date', 'es': 'Fecha de Fin', 'pt': 'Data de Término'},
     }
