@@ -89,8 +89,14 @@ translate_dict = {
     'cv': {'en': 'Coefficient of Variation (%)', 'es': 'Coeficiente de Variación (%)', 'pt': 'Coeficiente de Variação (%)'},
     'cv_rank': {'en': 'NDVI Standard Deviation and CV Ranking', 'es': 'Ranking por Desvío Estándar y CV de NDVI', 'pt': 'Classificação de Desvio Padrão e CV do NDVI'},
     'colour': {'en': 'Colour', 'es': 'Color', 'pt': 'Cor'},
-    'cleaning_option': {'en': 'Statistical Cleaning', 'es': 'Limpieza Estadistica', 'pt': 'Limpeza Estatística'},
+    'cleaning_option': {'en': 'Statistical Cleaning by the Savitzky–Golay Method', 'es': 'Limpieza Estadistica por el Método Savitzky–Golay ', 'pt': 'Limpeza Estatística pelo Método Savitzky–Golay'},
     'raw_data_option': {'en': 'Raw Data', 'es': 'Datos Sin Procesar', 'pt': 'Dados Não Trarados'},
     'start_date': {'en': 'Start Date', 'es': 'Fecha de Inicio', 'pt': 'Data de Inicio'},
     'end_date': {'en': 'End Date', 'es': 'Fecha de Fin', 'pt': 'Data de Término'},
+    'type_crop': {'en': 'Crop Type', 'es': 'Tipo de Cultivo', 'pt': 'Tipo de Cultura'},
+    'type_crop_warning': {'en': 'You can only select up to 2 types', 'es': 'Solo Puedes seleccionar hasta 2 tipos', 'pt': 'Você só pode selecionar até 2 tipos'},
+    'crop_select': {'en': 'Select crop', 'es': 'Selecciona cultivo', 'pt': 'Selecione o Cultura'},
+    'date_warning': {'en': 'The start date cannot be later than the end date.', 'es': 'La fecha de inicio no puede ser posterior a la fecha de fin.', 'pt': 'A data de início não pode ser posterior à data de término.'},
+    'date_warning2': {'en': 'The maximum range allowed is 240 days.', 'es': 'El rango máximo permitido es de 240 días.', 'pt': 'O intervalo máximo permitido é de 240 dias.'},
+    'date_warning3': {'en': 'The minimum range allowed between two dates is 15 days.', 'es': 'El rango mínimo permitido entre dos fechas es de 15 días.', 'pt': 'O intervalo mínimo permitido entre duas datas é de 15 dias.'}
     }

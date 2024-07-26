@@ -33,10 +33,11 @@ import ee
 import geemap.foliumap as geemap
 from shapely import wkt
 import random 
-
+import folium
+from folium import FeatureGroup, LayerControl
 
 # Interpolación, análisis espacial y NDVI
-from ndvi import extract_mean_ndvi_date
+from EE import extract_mean_ndvi_date
 from scipy.interpolate import RBFInterpolator
 
 # Importar módulos o paquetes locales
@@ -53,6 +54,10 @@ from scipy.signal import savgol_filter
 
 from functools import wraps
 import time
+
+from cultivos import cultivos_especificos
+import unicodedata
+
 def timeit(func):
     # Decorador para calcular el tiempo de ejecución de una función
     @wraps(func)
@@ -281,33 +286,87 @@ def main_app(user_info):
             ############################################################################
             # Cultivos
             ############################################################################
-
+            
             # Filtra el DataFrame basado en las áreas seleccionadas
             filtered_df = filtered_df[filtered_df['farm_name'].isin(selector_farms)]
 
-            # No obtengas los nombres únicos, en su lugar, utiliza todos los nombres
-            cultivos = sorted(filtered_df['crop'].unique().tolist())
+            # Función para eliminar tildes y caracteres acentuados
+            def normalize_string(s):
+                return ''.join(c for c in unicodedata.normalize('NFD', s)
+                            if unicodedata.category(c) != 'Mn').lower()
 
-            container = st.container()
-            select_all_cultivos = st.toggle(translate("select_all", lang), value=False, key='select_all_cultivos')
+            # Crear un diccionario de cultivos normalizados
+            cultivos_normalizados = {key: normalize_string(value[lang]) for key, value in cultivos_especificos.items()}
 
-            if select_all_cultivos:
-                selector_cultivos = container.multiselect(
-                    translate("crop", lang),
-                    cultivos,
-                    cultivos)  # Todos los cultivos están seleccionados por defecto
-            else:
-                selector_cultivos = container.multiselect(
-                    translate("crop", lang),
-                    cultivos,
-                    placeholder=translate("choose_option", lang))
+            
+            # Normaliza los nombres de cultivos en filtered_df
+
+            filtered_df['crop_normalized'] = filtered_df['crop'].apply(normalize_string)
+            
+            # Agrupar cultivos
+            grouped_cultivos = {}
+            for key, normalized_name in cultivos_normalizados.items():
+                if key != 'otros':  # Excluir 'otros' del agrupamiento normal
+                    grouped_cultivos[key] = filtered_df[filtered_df['crop_normalized'].str.contains(normalized_name, case=False, na=False)]['crop'].unique().tolist()
+
+            # Asignar los cultivos no coincidentes al grupo "Otros"
+            otros_cultivos = filtered_df[~filtered_df['crop_normalized'].isin([normalize_string(cultivo) for sublist in grouped_cultivos.values() for cultivo in sublist])]['crop'].unique().tolist()
+            if otros_cultivos:
+                grouped_cultivos['otros'] = otros_cultivos
+
+            # Filtrar grupos vacíos
+            grouped_cultivos = {key: value for key, value in grouped_cultivos.items() if value}
+
+            # Capitalizar nombres de grupos, utilizando el parámetro seleccionado por 'lang' del diccionario para 'otros'
+            grouped_cultivos = {key.capitalize(): value for key, value in grouped_cultivos.items()}
+            if 'otros' in grouped_cultivos:
+                grouped_cultivos[cultivos_especificos['otros'][lang].capitalize()] = grouped_cultivos.pop('otros')
+
+            # Crear el primer selector de grupos de cultivos sin el checkbox "Seleccionar Todos los Grupos"
+            default_groups = []  # Puedes definir un valor por defecto si lo deseas
+            selector_groups = st.multiselect(
+                translate('type_crop',lang),
+                options=list(grouped_cultivos.keys()),
+                default=default_groups,
+                placeholder=translate('choose_option',lang)
+            )
+
+            # Verificar la selección máxima de dos opciones
+            if len(selector_groups) > 2:
+                st.error(translate('type_crop_warning',lang))
+                selector_groups = selector_groups[:2]
+
+            # Crear el segundo selector de cultivos
+            cultivos_filtrados = [cultivo for grupo in selector_groups for cultivo in grouped_cultivos.get(grupo, [])]
+
+            # Mover el checkbox de "Seleccionar Todos los Cultivos" debajo del desplegable
+            default_filtered_cultivos = []  # Puedes definir un valor por defecto si lo deseas
+            selector_filtered_cultivos = st.multiselect(
+                translate('crop',lang),
+                options=cultivos_filtrados,
+                default=default_filtered_cultivos,
+                placeholder=translate('choose_option',lang)
+            )
+
+            select_all_filtered_cultivos = st.toggle(translate("select_all", lang), key='select_all_filtered_crops')
+
+            if select_all_filtered_cultivos:
+                selector_filtered_cultivos = st.multiselect(
+                    translate('crop_select',lang),
+                    options=cultivos_filtrados,
+                    default=cultivos_filtrados  # Todos los cultivos están seleccionados por defecto
+                )
+
+            # Filtrar el DataFrame basado en los cultivos seleccionados en el segundo selector
+            if selector_filtered_cultivos:
+                filtered_df = filtered_df[filtered_df['crop'].isin(selector_filtered_cultivos)]
                 
             ############################################################################
             # Híbridos / Variedades
             ############################################################################
 
             # Filtra el DataFrame basado en las áreas seleccionadas
-            filtered_df = filtered_df[filtered_df['crop'].isin(selector_cultivos)]
+            filtered_df = filtered_df[filtered_df['crop'].isin(selector_filtered_cultivos)]
 
             # No obtengas los nombres únicos, en su lugar, utiliza todos los nombres
             hibrido = sorted(filtered_df['hybrid'].unique().tolist())
@@ -365,6 +424,8 @@ def main_app(user_info):
             #Fecha
             ###########################################################################
             
+            st.write(translate("select_date_range",lang))
+
             # Asegúrate de que start_date, end_date y crop_date están en formato datetime
             filtered_df['start_date'] = pd.to_datetime(filtered_df['start_date'], errors='coerce')
             filtered_df['end_date'] = pd.to_datetime(filtered_df['end_date'], errors='coerce')
@@ -414,16 +475,7 @@ def main_app(user_info):
             if default_end > max_date:
                 default_end = max_date
             
-            # # Asumiendo que `translate`, `default_start`, `default_end`, `min_date` y `max_date` están definidos
-            # selected_date_range = date_range_picker(
-            #     title=translate("select_date_range", lang),
-            #     default_start=default_start.date(),
-            #     default_end=default_end.date(),
-            #     min_date=min_date.date(),
-            #     max_date=max_date.date(),
-            #     error_message=translate("error_message_date_picker",lang)  # Puedes ajustar este mensaje si lo deseas
-            # )
-
+            
             # Crear un selector para la fecha de inicio
             start_date = st.date_input(
                 label=translate('start_date', lang),
@@ -451,11 +503,11 @@ def main_app(user_info):
             start_date, end_date = selected_date_range
 
             if start_date > end_date:
-                st.error("La fecha de inicio no puede ser posterior a la fecha de fin.")
+                st.error(translate('date_warning',lang))
             elif (end_date - start_date).days > 240:
-                st.error("El rango máximo permitido es de 240 días.")
-            elif (end_date - start_date).days < 5:
-                raise KeyError("El rango mínimo permitido entre dos fechas es de 5 días.")
+                st.error(translate('date_warning2',lang))
+            elif (end_date - start_date).days < 14:
+                raise KeyError(translate('date_warning3',lang))
             else:
                 # Asignar las fechas seleccionadas a todas las filas de las columnas START_DATE y END_DATE
                 filtered_df = filtered_df.assign(
@@ -466,21 +518,7 @@ def main_app(user_info):
             ###########################################################################
             #Tipo de limpieza
             ###########################################################################   
-                        
-            # # Configuración de las opciones
-            # cleaning_option = translate('cleaning_option', lang)
-            # raw_data_option = translate('raw_data_option', lang)
-
-            # # Crear un contenedor
-            # container = st.container()
-
-            # # Agregar el toggle al contenedor
-            # with container:
-            #     # El valor por defecto es True para seleccionar cleaning_option
-            #     toggle_value = st.toggle('Limpieza estadistica activa', value=True)
-
-            # # Mapeo del valor del toggle a las opciones
-            # selected_option = cleaning_option if toggle_value else raw_data_option
+            st.divider()
 
             # Configuración de las opciones
             cleaning_option = translate('cleaning_option', lang)  # "Limpieza estadística"
@@ -491,21 +529,17 @@ def main_app(user_info):
 
             # Agregar el toggle al contenedor
             with container:
-                col1, col2 = st.columns([4, 1])  # Ajustar la proporción de las columnas según sea necesario
+                col1, col2 = st.columns([1, 4])  # Ajustar la proporción de las columnas según sea necesario
 
                 with col1:
-                    st.write("Tipo de Limpieza de Datos")
-
-                with col2:
                     toggle_value = st.toggle("", value=True)
-
                 
+                with col2:
+                    # Mapeo del valor del toggle a las opciones
+                        selected_option = cleaning_option if toggle_value else raw_data_option
 
-            # Mapeo del valor del toggle a las opciones
-            selected_option = cleaning_option if toggle_value else raw_data_option
-
-            st.write(f"Opción seleccionada: {selected_option}")
-        
+                        st.write(selected_option)
+            
             ############################################################################
             # Powered by GeoAgro Picture
             ############################################################################
@@ -534,7 +568,6 @@ def main_app(user_info):
                 pass
             ############################################################################
 
-        #st.dataframe(filtered_df)
         # Verifica si no hay lotes seleccionados
         if filtered_df.empty:
             st.warning(translate('select_warning',lang))
@@ -550,42 +583,51 @@ def main_app(user_info):
                 # Metricas
                 ############################################################################
 
-                col1, col2, col3, col4, col5 = st.columns(5)
+                col1, col2, col3 = st.columns(3)
+
+                # Workspaces
+                total_ws = len(filtered_df['workspace_name'].unique())
+                col1.metric(
+                    translate("workspace", lang), 
+                    total_ws
+                )
 
                 # Establecimientos
-                col1.metric(
+                col2.metric(
                     translate("farms", lang), 
                     len(filtered_df['farm_name'].unique())
                 )
 
                 # Lotes
                 total_lotes = len(filtered_df['field_name'])
-                col2.metric(
+                col3.metric(
                     translate("fields", lang), 
                     total_lotes
                 )
 
+                col1, col2, col3 = st.columns(3)
+
                 # Hectáreas
                 total_hectareas = sum(filtered_df['hectares'])  # Suma sin convertir a miles
-                col3.metric(
+                col1.metric(
                     translate("hectares", lang), 
                     f"{total_hectareas:,.0f}"  # Formatea con separadores de miles y sin decimales
                 )
 
                 # Cultivos
-                col4.metric(
+                col2.metric(
                     translate("crops", lang), 
                     len(filtered_df['crop'].unique())
                 )
 
                 # Híbridos
-                col5.metric(
+                col3.metric(
                     translate("hybrid_varieties", lang), 
                     len(filtered_df['hybrid'].unique())
                 )
 
                 # Agregar las métricas
-                col1, col2, col3, col4, col5 = st.columns(5)
+                col1, col2, col3 = st.columns(3)
 
                 style_metric_cards(border_left_color="#0e112c", box_shadow=False)
                         
@@ -690,15 +732,10 @@ def main_app(user_info):
                 pivot_esa['DateNum'] = (pivot_esa['Date'] - min_date) / np.timedelta64(1, 'D')
                 date_num_all = (all_dates - min_date) / np.timedelta64(1, 'D')
 
-                
-
                 # Preparar un nuevo DataFrame para almacenar resultados interpolados
                 interpolated_df_esa = pd.DataFrame({'Date': all_dates, 'DateNum': date_num_all})
 
                 
-                # Crear una copia del DataFrame original para asegurarse de que los valores originales no se modifiquen
-                #interpolated_df_esa = pivot_esa.copy()
-
                 # Interpolar valores faltantes para cada lote usando RBFInterpolator
                 for column in pivot_esa.columns:
                     if column not in ['Date', 'DateNum']:
@@ -851,31 +888,22 @@ def main_app(user_info):
                     return fig
                 
                 def create_bar_chart(df, y_column, lotes, color_map):
-                    data = []
+                    fig = go.Figure()
+                    
                     for lot in lotes:
                         filtered_values = df[df['Lote'] == lot][y_column].values
-                        if len(filtered_values) > 0:
-                            data.append({
-                                'x': lot,
-                                'y': filtered_values[0],
-                                'color': color_map.get(lot, '#4C78A8')  # Usar el color del color_map o un color por defecto
-                            })
-                        else:
-                            data.append({
-                                'x': lot,
-                                'y': 0,
-                                'color': color_map.get(lot, '#4C78A8')  # Usar el color del color_map o un color por defecto
-                            })
+                        y_value = filtered_values[0] if len(filtered_values) > 0 else 0
+                        fig.add_trace(go.Bar(
+                            x=[lot],
+                            y=[y_value],
+                            marker_color=color_map.get(lot, '#4C78A8'),  # Usar el color del color_map o un color por defecto
+                            name=lot  # Nombre para la leyenda
+                        ))
                     
-                    fig = go.Figure(data=[go.Bar(
-                        x=[d['x'] for d in data],
-                        y=[d['y'] for d in data],
-                        marker_color=[d['color'] for d in data]
-                    )])
+                    fig.update_layout(showlegend=True)  # Mostrar la leyenda
                     
                     return fig
                 
-
                 ############################################################################
                 #VISUALIZACIONES
                 ############################################################################
@@ -992,14 +1020,6 @@ def main_app(user_info):
                 def random_color():
                     return "#{:06x}".format(random.randint(0, 0xFFFFFF))
 
-                # Crear un diccionario para los colores según 'farm_name'
-                farm_names = gdf[translate('farm', lang)].unique()
-                color_dict = {farm_name: random_color() for farm_name in farm_names}
-
-                # Función para generar un color aleatorio en formato hex
-                def random_color():
-                    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
-
                 # Crear un diccionario para los colores según 'field_name' usando color_map
                 def get_field_color(field_name):
                     return color_map.get(field_name, random_color())['color']
@@ -1015,10 +1035,16 @@ def main_app(user_info):
                     }
                 
                 # Añadir las geometrías al mapa
-                
-                Map.add_gdf(gdf, layer_name=translate("fields",lang), fields=[translate("field",lang)], style_function=style_function)
+                # Agrega la capa de teselas de Esri World Imagery
+                tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' 
+                attr = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
 
-                Map.add_basemap("SATELLITE")
+                # Agrega las capas de teselas adicionales y el control de capas
+                folium.TileLayer(tiles, attr=attr, name='Esri World Imagery', show=True).add_to(Map)
+
+                Map.add_gdf(gdf, layer_name=translate("fields",lang), fields=[translate("field",lang)], style_function=style_function)
+                                
+                LayerControl(collapsed=True).add_to(Map)
 
                 Map.to_streamlit()
 
@@ -1039,11 +1065,9 @@ def main_app(user_info):
 
                 st.write(translate('ndvi_date', lang))
 
-                tab1, tab2 = st.tabs(["Crudo", "Savitzky–Golay "])
+                tab1, tab2 = st.tabs([translate("raw_data_option",lang), "Savitzky–Golay "])
 
                 with tab1:
-
-                    #interpolated_df2=interpolated_df
 
                     # Formatear la columna de fecha para mostrar solo año, mes y día
                     interpolated_df_esa['Date'] = interpolated_df_esa['Date'].dt.strftime('%Y-%m-%d')
@@ -1061,8 +1085,6 @@ def main_app(user_info):
                                 width=100000)
                 
                 with tab2:
-
-                    #interpolated_df2=interpolated_df
 
                     # Formatear la columna de fecha para mostrar solo año, mes y día
                     interpolated_df_sg['Date'] = interpolated_df_sg['Date'].dt.strftime('%Y-%m-%d')
@@ -1088,7 +1110,7 @@ def main_app(user_info):
                 st.markdown('')
                 st.write(translate('ndvi_serie', lang))
 
-                tab1, tab2= st.tabs(["Crudo", "Savitzky–Golay "])
+                tab1, tab2= st.tabs([translate("raw_data_option",lang), "Savitzky–Golay "])
 
                 with tab1:
 
@@ -1203,10 +1225,9 @@ def main_app(user_info):
                 st.markdown('')
                 st.write(translate('ndvi_heatmap', lang))
 
-                
                 interpolated_df.drop('PROMEDIO', axis=1, inplace=True)
 
-                # Definir la paleta de colores personalizada basada en la imagen proporcionada
+                # Definir la paleta de colores personalizada
                 custom_colorscale = [
                     [0.0, 'rgb(0, 0, 0)'],         # Negro
                     [0.05, 'rgb(160, 82, 45)'],    # A0522D - Marrón
@@ -1231,9 +1252,6 @@ def main_app(user_info):
                     [1.0, 'rgb(51, 67, 178)'],     # 3343b2 - Azul oscuro
                 ]
 
-                # Calcular la altura del gráfico
-                #altura_grafico = len(interpolated_df.columns[1:]) * 55
-
                 # Obtener los valores de las columnas de lotes (excluyendo la columna 'Date')
                 lotes_values = interpolated_df.drop(columns='Date').values
 
@@ -1247,27 +1265,37 @@ def main_app(user_info):
                 for i, lotes_value in enumerate(lotes_values.T):
                     z[i, :] = lotes_value
 
+                # Crear la matriz de texto para las etiquetas de hover
+                hovertext = []
+                for i, column in enumerate(interpolated_df.columns[1:]):
+                    hovertext.append([f"<b>{translate('date2', lang)}:</b> {fechas[j]}<br><b>{translate('field', lang)}:</b> {column}<br><b>NDVI:</b> {z[i, j]}" for j in range(len(fechas))])
+
+                # Calcular la altura del gráfico
+                if len(interpolated_df.columns[1:]) > 0:
+                    altura_grafico = len(interpolated_df.columns[1:]) * 55
+                else:
+                    altura_grafico = 650  # Valor predeterminado si no hay columnas
+
                 # Crear el heatmap
                 fig = go.Figure(data=go.Heatmap(
                     z=z,
                     x=fechas,
                     y=interpolated_df.columns[1:],  # Columnas de lotes
-                    colorscale=custom_colorscale ))
+                    colorscale=custom_colorscale,
+                    hovertext=hovertext,  # Asignar la matriz de texto
+                    hoverinfo="text"  # Mostrar la información de hovertext
+                ))
 
                 # Personalizar el diseño
-                fig.update_layout(                
-                    xaxis_title= translate("date2", lang),
-                    yaxis_title= translate("field", lang),
-                    autosize = True,
-                    height=650)
-                
-                fig.update_traces(
-                    hovertemplate=f'<b>{translate("date2", lang)}:</b> %{{x}}<br><b>{translate("field", lang)}:</b> {column}<br><b>NDVI:</b> %{{z}}<extra></extra>' #Traducir variables del cuadro interactivo
-                    )
+                fig.update_layout(
+                    xaxis_title=translate("date2", lang),
+                    yaxis_title=translate("field", lang),
+                    autosize=True,
+                    height=altura_grafico
+                )
 
                 # Mostrar el heatmap
                 st.plotly_chart(fig, use_container_width=True)
-
                 ############################################################################
 
                 #BOXPLOT
@@ -1366,28 +1394,42 @@ def main_app(user_info):
                 fig_integral2.update_traces(
                     hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_integral", lang)}:</b> %{{y}}<extra></extra>'  # Traducir variables del cuadro interactivo
                 )
-                
-                # Ajustar la altura del gráfico
-                # fig_integral2.update_layout(height=500) 
+
+                # Agregar leyenda
+                fig_integral2.update_layout(
+                    showlegend=True,
+                    legend=dict(
+                        title=translate('field', lang)
+                        )
+                    )
 
                 st.plotly_chart(fig_integral2, use_container_width=True)
                 ############################################################################
                 #GRAFICA SD
 
+                # Mostrar el título traducido
                 st.write(translate('ndvi_sd_rank', lang))
-                                
-                fig_desvio2 = create_bar_chart(ranking_desvio, 'Desvio_Estandar', lotes, color_map2) #En funcion del Color_map
 
-                fig_desvio2.update_xaxes(title_text= translate('field', lang), tickangle=-45)  # Actualizar el título del eje x
-                fig_desvio2.update_yaxes(title_text= translate('ndvi_sd', lang))
+                # Crear el gráfico de barras
+                fig_desvio2 = create_bar_chart(ranking_desvio, 'Desvio_Estandar', lotes, color_map2)
 
+                # Actualizar el título del eje x y el ángulo de las etiquetas
+                fig_desvio2.update_xaxes(title_text=translate('field', lang), tickangle=-45)
+
+                # Actualizar el título del eje y
+                fig_desvio2.update_yaxes(title_text=translate('ndvi_sd', lang))
+
+                # Actualizar el hovertemplate
                 fig_desvio2.update_traces(
-                    hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' #Traducir variables del cuadro interactivo
-                    )
-                
-                # Ajustar la altura del gráfico
-                fig_desvio2.update_layout(height=500) 
+                    hovertemplate=f'<b>{translate("field", lang)}:</b> %{{x}}<br><b>{translate("ndvi_sd", lang)}:</b> %{{y}}<extra></extra>' 
+                )
 
+                # Ajustar la altura del gráfico
+                fig_desvio2.update_layout(
+                    height=500
+                    )
+
+                # Mostrar el gráfico en Streamlit
                 st.plotly_chart(fig_desvio2, use_container_width=True)
                 
                 
