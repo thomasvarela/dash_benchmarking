@@ -55,7 +55,6 @@ from scipy.signal import savgol_filter
 from functools import wraps
 import time
 
-from cultivos import cultivos_especificos
 import unicodedata
 
 def timeit(func):
@@ -289,6 +288,23 @@ def main_app(user_info):
             
             # Filtra el DataFrame basado en las áreas seleccionadas
             filtered_df = filtered_df[filtered_df['farm_name'].isin(selector_farms)]
+                        
+            # Diccionario para cultivos específicos en diferentes idiomas
+            cultivos_especificos = {
+                'maiz': {'es': 'Maíz', 'en': 'Corn', 'pt': 'Milho'},
+                'trigo': {'es': 'Trigo', 'en': 'Wheat', 'pt': 'Trigo'},
+                'soja': {'es': 'Soja', 'en': 'Soybean', 'pt': 'Soja'},
+                'girasol': {'es': 'Girasol', 'en': 'Sunflower', 'pt': 'Girassol'},
+                'cebada': {'es': 'Cebada', 'en': 'Barley', 'pt': 'Cevada'},
+                'sorgo': {'es': 'Sorgo', 'en': 'Sorghum', 'pt': 'Sorgo'},
+                'poroto': {'es': 'Poroto', 'en': 'Bean', 'pt': 'Feijão'},
+                'otros': {'es': 'Otros', 'en': 'Others', 'pt': 'Outras'},
+                'papa': {'es': 'Papa', 'en': 'Potato', 'pt': 'Batata'},
+                'avena': {'es': 'Avena', 'en': 'Oat', 'pt': 'Aveia'},
+                'colza': {'es': 'Colza', 'en': 'Canola', 'pt': 'Colza'},
+                'mani': {'es': 'Maní', 'en': 'Peanut', 'pt': 'Amendoim'},
+                'no_asignado':{'es': '-No asignado-', 'en': '-Not assigned-', 'pt': '-No asignado-'}
+            }
 
             # Función para eliminar tildes y caracteres acentuados
             def normalize_string(s):
@@ -298,16 +314,23 @@ def main_app(user_info):
             # Crear un diccionario de cultivos normalizados
             cultivos_normalizados = {key: normalize_string(value[lang]) for key, value in cultivos_especificos.items()}
 
-            
             # Normaliza los nombres de cultivos en filtered_df
-
             filtered_df['crop_normalized'] = filtered_df['crop'].apply(normalize_string)
-            
+
             # Agrupar cultivos
             grouped_cultivos = {}
             for key, normalized_name in cultivos_normalizados.items():
-                if key != 'otros':  # Excluir 'otros' del agrupamiento normal
-                    grouped_cultivos[key] = filtered_df[filtered_df['crop_normalized'].str.contains(normalized_name, case=False, na=False)]['crop'].unique().tolist()
+                if key != 'otros' and key != 'no_asignado':  # Excluir 'otros' y 'no_asignado' del agrupamiento normal
+                    cultivos = filtered_df[filtered_df['crop_normalized'].str.contains(normalized_name, case=False, na=False)]['crop'].unique().tolist()
+                    if cultivos:  # Solo agregar grupos con cultivos presentes en filtered_df
+                        grouped_cultivos[key] = cultivos
+
+            # Obtener los cultivos no asignados
+            no_asignado_cultivos = filtered_df[filtered_df['crop_normalized'].str.contains(cultivos_normalizados.get('no_asignado', ''), case=False, na=False)]['crop'].unique().tolist()
+
+            # Incluir los cultivos no asignados en cada grupo
+            for key in grouped_cultivos:
+                grouped_cultivos[key].extend(no_asignado_cultivos)
 
             # Asignar los cultivos no coincidentes al grupo "Otros"
             otros_cultivos = filtered_df[~filtered_df['crop_normalized'].isin([normalize_string(cultivo) for sublist in grouped_cultivos.values() for cultivo in sublist])]['crop'].unique().tolist()
@@ -325,34 +348,36 @@ def main_app(user_info):
             # Crear el primer selector de grupos de cultivos sin el checkbox "Seleccionar Todos los Grupos"
             default_groups = []  # Puedes definir un valor por defecto si lo deseas
             selector_groups = st.multiselect(
-                translate('type_crop',lang),
+                translate('type_crop', lang),
                 options=list(grouped_cultivos.keys()),
                 default=default_groups,
-                placeholder=translate('choose_option',lang)
+                placeholder=translate('choose_option', lang)
             )
 
             # Verificar la selección máxima de dos opciones
             if len(selector_groups) > 2:
-                st.error(translate('type_crop_warning',lang))
+                st.error(translate('type_crop_warning', lang))
                 selector_groups = selector_groups[:2]
 
             # Crear el segundo selector de cultivos
             cultivos_filtrados = [cultivo for grupo in selector_groups for cultivo in grouped_cultivos.get(grupo, [])]
 
+            # Excluir 'no_asignado' del valor por defecto
+            default_filtered_cultivos = [cultivo for cultivo in cultivos_filtrados if cultivo not in no_asignado_cultivos]
+
             # Mover el checkbox de "Seleccionar Todos los Cultivos" debajo del desplegable
-            default_filtered_cultivos = []  # Puedes definir un valor por defecto si lo deseas
             selector_filtered_cultivos = st.multiselect(
-                translate('crop',lang),
+                translate('crop', lang),
                 options=cultivos_filtrados,
                 default=default_filtered_cultivos,
-                placeholder=translate('choose_option',lang)
+                placeholder=translate('choose_option', lang)
             )
 
             select_all_filtered_cultivos = st.toggle(translate("select_all", lang), key='select_all_filtered_crops')
 
             if select_all_filtered_cultivos:
                 selector_filtered_cultivos = st.multiselect(
-                    translate('crop_select',lang),
+                    translate('crop_select', lang),
                     options=cultivos_filtrados,
                     default=cultivos_filtrados  # Todos los cultivos están seleccionados por defecto
                 )
@@ -372,7 +397,7 @@ def main_app(user_info):
             hibrido = sorted(filtered_df['hybrid'].unique().tolist())
 
             container = st.container()
-            select_all_hibrido = st.toggle(translate("select_all", lang), value=False, key='select_all_hibrido')
+            select_all_hibrido = st.toggle(translate("select_all", lang), value=True, key='select_all_hibrido')
 
             if select_all_hibrido:
                 selector_hibrido = container.multiselect(
@@ -396,7 +421,7 @@ def main_app(user_info):
             fields = sorted(filtered_df['field_name'].unique().tolist())
 
             container = st.container()
-            select_all_fields = st.toggle(translate("select_all", lang), value=False, key='select_all_fields')
+            select_all_fields = st.toggle(translate("select_all", lang), value=True, key='select_all_fields')
 
             if select_all_fields:
                 selector_fields = container.multiselect(
@@ -1051,17 +1076,12 @@ def main_app(user_info):
                 ############################################################################
                 st.divider()
                 st.markdown('')
-
-                # Mostrar la tabla con los datos finales NDVI interpolados
-
+                
                 st.markdown(f"<b>{translate('ndvi_results', lang)}</b>", unsafe_allow_html=True)
                 st.markdown('')
                 st.markdown('')
-
                 
-                ############################################################################
-                
-                #CUADRO NDVI POR FECHA Y LOTE
+                #CUADROS NDVI INTERPOLADOS POR FECHA Y LOTE
 
                 st.write(translate('ndvi_date', lang))
 
@@ -1271,10 +1291,10 @@ def main_app(user_info):
                     hovertext.append([f"<b>{translate('date2', lang)}:</b> {fechas[j]}<br><b>{translate('field', lang)}:</b> {column}<br><b>NDVI:</b> {z[i, j]}" for j in range(len(fechas))])
 
                 # Calcular la altura del gráfico
-                if len(interpolated_df.columns[1:]) > 0:
+                if len(interpolated_df.columns[1:]) > 5:
                     altura_grafico = len(interpolated_df.columns[1:]) * 55
                 else:
-                    altura_grafico = 650  # Valor predeterminado si no hay columnas
+                    altura_grafico = 550  # Valor predeterminado si no hay columnas
 
                 # Crear el heatmap
                 fig = go.Figure(data=go.Heatmap(
