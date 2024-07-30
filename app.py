@@ -37,7 +37,7 @@ import folium
 from folium import FeatureGroup, LayerControl
 
 # Interpolación, análisis espacial y NDVI
-from EE import extract_mean_ndvi_date
+from GEE import extract_mean_ndvi_date
 from scipy.interpolate import RBFInterpolator
 
 # Importar módulos o paquetes locales
@@ -687,7 +687,7 @@ def main_app(user_info):
 
             # Definir una función para procesar un índice dado y llamar a extract_mean_ndvi_date
             @timeit
-            @st.cache_data(show_spinner=False)
+            #@st.cache_data(show_spinner=False)
             def get_cached_index_data(index, row, days_before_start, days_after_end):
                 lote_gdf_filtrado = pd.DataFrame([row])
                 extended_start_date = row['START_DATE'] - timedelta(days=days_before_start)
@@ -712,17 +712,22 @@ def main_app(user_info):
 
                 return df_temp
 
-            def process_index(index, row, days_before_start, days_after_end):
-                return get_cached_index_data(index, row, days_before_start, days_after_end)
+            # def process_index(index, row, days_before_start, days_after_end):
+            #     return get_cached_index_data(index, row, days_before_start, days_after_end)
 
             # Parámetros
             days_before_start = 30
             days_after_end = 30
 
-            for index, row in filtered_df.iterrows():
-                result = process_index(index, row, days_before_start, days_after_end)
-                if result is not None and not result.empty:
-                    final_df_list.append(result)
+            # Uso de ThreadPoolExecutor para paralelizar el procesamiento
+            with ThreadPoolExecutor() as executor:
+                futures = [executor.submit(get_cached_index_data, index, row, days_before_start, days_after_end)
+                        for index, row in filtered_df.iterrows()]
+
+                for future in futures:
+                    result = future.result()
+                    if result is not None and not result.empty:
+                        final_df_list.append(result)
 
             if final_df_list:
                 final_df = pd.concat(final_df_list, ignore_index=True)
@@ -798,11 +803,18 @@ def main_app(user_info):
                 window_size = 15  # Asegurarse de que el tamaño de la ventana sea un número impar
                 poly_order = 3 # Orden del polinomio
 
-                #Aplicar filtro de Savitzky-Golay para cada columna numérica
+                # Aplicar filtro de Savitzky-Golay para cada columna numérica
                 for column in pivot_sg.columns:
                     if column not in ['Date']:
+                        # Obtener datos interpolados para evitar valores NaN
+                        data = pivot_sg[column].interpolate()
+                        
+                        # Ajustar window_size si es mayor que el tamaño de los datos
+                        if window_size > len(data):
+                            window_size = len(data) if len(data) % 2 != 0 else len(data) - 1  # window_size debe ser impar
+                        
                         # Aplicar el filtro de Savitzky-Golay
-                        pivot_sg[column] = savgol_filter(pivot_sg[column].interpolate(), window_length=window_size, polyorder=poly_order)
+                        pivot_sg[column] = savgol_filter(data, window_length=window_size, polyorder=poly_order)
 
                 # Crear un rango completo de fechas desde el mínimo hasta el máximo extendido
                 min_date = pivot_sg['Date'].min()
@@ -932,76 +944,7 @@ def main_app(user_info):
                 ############################################################################
                 #VISUALIZACIONES
                 ############################################################################
-
-                ############################################################################
-                # TABLA RESUMEN LOTES
-                
-                st.divider()  # 👈 Draws a horizontal rule
-                st.markdown('')
-                st.markdown(f"<b>{translate('select_fields', lang)}</b>", unsafe_allow_html=True)
-
-                # Agregar la columna de color al DataFrame
-                df_lotes_seleccionados['color'] = df_lotes_seleccionados['field_name'].map(lambda x: color_map[x]['color'])
-                df_lotes_seleccionados['order'] = df_lotes_seleccionados['field_name'].map(lambda x: color_map[x]['order'])
-
-                # Ordenar el DataFrame por la columna 'order'
-                df_lotes_seleccionados = df_lotes_seleccionados.sort_values(by='order')
-
-                df_lotes_seleccionados.reset_index(drop=True, inplace=True)
-                df_lotes_seleccionados.index += 1
-
-                translations = {
-                    'area_name': translate('area', lang),
-                    'workspace_name': translate('workspace', lang),
-                    'season_name': translate('season', lang),
-                    'farm_name': translate('farm', lang),
-                    'field_name': translate('field', lang),
-                    'crop': translate('crop', lang),
-                    'hybrid': translate('hybrid_varieties', lang),
-                    'crop_date': translate('seeding_date', lang),  
-                    'hectares': translate('hectares', lang),
-                    'color_html': translate('colour', lang)
-                    }  
-                
-                # Estilo CSS para ocupar todo el ancho de la pantalla
-                st.markdown("""
-                    <style>
-                    .dataframe {
-                        width: 100%;
-                        table-layout: fixed;
-                    }
-                    .dataframe td, .dataframe th {
-                        word-wrap: break-word;
-                        text-align: center;
-                        font-weight: normal;
-                        font-size: 14px;  /* Ajusta el tamaño de la letra según sea necesario */
-                    }
-                    .dataframe th.index_name, .dataframe th.row_heading {
-                        font-weight: normal;
-                    }
-                    </style>
-                """, unsafe_allow_html=True)
-                
-                # Crear una función para mostrar el color como un cuadrado relleno
-                def color_square_html(color):
-                    return f'<div style="width:20px; height:20px; background-color:{color};"></div>'
-
-                # Aplicar la función para generar la columna HTML
-                df_lotes_seleccionados['color_html'] = df_lotes_seleccionados['color'].apply(color_square_html)
-
-                # Renombrar las columnas en el DataFrame
-                df_lotes_seleccionados.rename(columns=translations, inplace=True)   
-
-                # Configurar Streamlit para mostrar el DataFrame con la columna de color HTML
-                st.write(df_lotes_seleccionados.to_html(escape=False, columns=[
-                    translations['area_name'], translations['workspace_name'], translations['season_name'],
-                    translations['farm_name'], translations['field_name'], translations['crop'],
-                    translations['hybrid'], translations['crop_date'], translations['hectares'], translations['color_html']
-                ]), unsafe_allow_html=True)
-
                                 
-                ############################################################################
-                
                 # MAPA
                 st.divider()
                 st.markdown('')
@@ -1058,6 +1001,19 @@ def main_app(user_info):
                         'weight': 1.5,
                         'fillOpacity': 0.6,
                     }
+                # Crear la función de tooltip
+                def create_tooltip(properties):
+                    tooltip_text = f"""
+                    <b>{translate('area', lang)}:</b> {properties.get(translate('area', lang), 'N/A')}<br>
+                    <b>{translate('workspace', lang)}:</b> {properties.get(translate('workspace', lang), 'N/A')}<br>
+                    <b>{translate('season', lang)}:</b> {properties.get(translate('season', lang), 'N/A')}<br>
+                    <b>{translate('farm', lang)}:</b> {properties.get(translate('farm', lang), 'N/A')}<br>
+                    <b>{translate('field', lang)}:</b> {properties.get(translate('field', lang), 'N/A')}<br>
+                    <b>{translate('crop', lang)}:</b> {properties.get(translate('crop', lang), 'N/A')}<br>
+                    <b>{translate('seeding_date', lang)}:</b> {properties.get(translate('seeding_date', lang), 'N/A')}<br>
+                    <b>{translate('hectares', lang)}:</b> {properties.get(translate('hectares', lang), 'N/A')}
+                    """
+                    return tooltip_text
                 
                 # Añadir las geometrías al mapa
                 # Agrega la capa de teselas de Esri World Imagery
@@ -1067,7 +1023,34 @@ def main_app(user_info):
                 # Agrega las capas de teselas adicionales y el control de capas
                 folium.TileLayer(tiles, attr=attr, name='Esri World Imagery', show=True).add_to(Map)
 
-                Map.add_gdf(gdf, layer_name=translate("fields",lang), fields=[translate("field",lang)], style_function=style_function)
+                #Agregar GeoDataFrame al mapa con tooltip
+                folium.GeoJson(
+                    gdf,
+                    name=translate("fields", lang),
+                    style_function=style_function,
+                    tooltip=folium.GeoJsonTooltip(
+                        fields=[
+                            translate('area', lang),
+                            translate('workspace', lang),
+                            translate('season', lang),
+                            translate('farm', lang),
+                            translate('field', lang),
+                            translate('crop', lang),
+                            translate('seeding_date', lang),
+                            translate('hectares', lang)
+                        ],
+                        aliases=[
+                            translate('area', lang),
+                            translate('workspace', lang),
+                            translate('season', lang),
+                            translate('farm', lang),
+                            translate('field', lang),
+                            translate('crop', lang),
+                            translate('seeding_date', lang),
+                            translate('hectares', lang)
+                        ]
+                    )
+                ).add_to(Map)
                                 
                 LayerControl(collapsed=True).add_to(Map)
 
@@ -1082,44 +1065,44 @@ def main_app(user_info):
                 st.markdown('')
                 
                 #CUADROS NDVI INTERPOLADOS POR FECHA Y LOTE
-
-                st.write(translate('ndvi_date', lang))
-
-                tab1, tab2 = st.tabs([translate("raw_data_option",lang), "Savitzky–Golay "])
-
-                with tab1:
-
-                    # Formatear la columna de fecha para mostrar solo año, mes y día
-                    interpolated_df_esa['Date'] = interpolated_df_esa['Date'].dt.strftime('%Y-%m-%d')
-
-                    # Usar st.markdown para insertar CSS personalizado
-                    st.markdown("""
-                        <style>
-                        .dataframe th, .dataframe td {
-                            text-align: center !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)            
+                                
+                with st.expander(translate('ndvi_date', lang),expanded=False):
                     
-                    st.dataframe(interpolated_df_esa,                        
-                                width=100000)
-                
-                with tab2:
+                    tab1, tab2 = st.tabs(["Savitzky–Golay ", translate("raw_data_option",lang)])
 
-                    # Formatear la columna de fecha para mostrar solo año, mes y día
-                    interpolated_df_sg['Date'] = interpolated_df_sg['Date'].dt.strftime('%Y-%m-%d')
+                    with tab2:
 
-                    # Usar st.markdown para insertar CSS personalizado
-                    st.markdown("""
-                        <style>
-                        .dataframe th, .dataframe td {
-                            text-align: center !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)            
+                        # Formatear la columna de fecha para mostrar solo año, mes y día
+                        interpolated_df_esa['Date'] = interpolated_df_esa['Date'].dt.strftime('%Y-%m-%d')
+
+                        # Usar st.markdown para insertar CSS personalizado
+                        st.markdown("""
+                            <style>
+                            .dataframe th, .dataframe td {
+                                text-align: center !important;
+                            }
+                            </style>
+                            """, unsafe_allow_html=True)            
+                        
+                        st.dataframe(interpolated_df_esa,                        
+                                    width=100000)
                     
-                    st.dataframe(interpolated_df_sg,                        
-                                width=100000)
+                    with tab1:
+
+                        # Formatear la columna de fecha para mostrar solo año, mes y día
+                        interpolated_df_sg['Date'] = interpolated_df_sg['Date'].dt.strftime('%Y-%m-%d')
+
+                        # Usar st.markdown para insertar CSS personalizado
+                        st.markdown("""
+                            <style>
+                            .dataframe th, .dataframe td {
+                                text-align: center !important;
+                            }
+                            </style>
+                            """, unsafe_allow_html=True)            
+                        
+                        st.dataframe(interpolated_df_sg,                        
+                                    width=100000)
                 
                                 
                 ############################################################################
@@ -1130,9 +1113,9 @@ def main_app(user_info):
                 st.markdown('')
                 st.write(translate('ndvi_serie', lang))
 
-                tab1, tab2= st.tabs([translate("raw_data_option",lang), "Savitzky–Golay "])
+                tab1, tab2 = st.tabs(["Savitzky–Golay ", translate("raw_data_option",lang)])
 
-                with tab1:
+                with tab2:
 
                     # Calcular la media de las columnas NDVI (suponiendo que las columnas NDVI son todas excepto la primera columna 'Date')
                     ndvi_columns = interpolated_df_esa.columns[1:]
@@ -1185,7 +1168,7 @@ def main_app(user_info):
 
                     st.plotly_chart(fig, use_container_width=True)
 
-                    with tab2:
+                    with tab1:
 
                         # Calcular la media de las columnas NDVI (suponiendo que las columnas NDVI son todas excepto la primera columna 'Date')
                         ndvi_columns = interpolated_df_sg.columns[1:]
@@ -1278,6 +1261,9 @@ def main_app(user_info):
                 # Obtener las fechas
                 fechas = interpolated_df['Date'].values
 
+                # Convertir los nombres de los lotes a cadenas de texto
+                lotes_labels = [str(label) for label in interpolated_df.columns[1:]]
+
                 # Crear una matriz z con ceros, con filas para cada lote y columnas para cada fecha
                 z = np.zeros((len(lotes_values), len(fechas)))
 
@@ -1287,20 +1273,20 @@ def main_app(user_info):
 
                 # Crear la matriz de texto para las etiquetas de hover
                 hovertext = []
-                for i, column in enumerate(interpolated_df.columns[1:]):
+                for i, column in enumerate(lotes_labels):
                     hovertext.append([f"<b>{translate('date2', lang)}:</b> {fechas[j]}<br><b>{translate('field', lang)}:</b> {column}<br><b>NDVI:</b> {z[i, j]}" for j in range(len(fechas))])
 
                 # Calcular la altura del gráfico
-                if len(interpolated_df.columns[1:]) > 5:
-                    altura_grafico = len(interpolated_df.columns[1:]) * 55
+                if len(lotes_labels) > 5:
+                    altura_grafico = len(lotes_labels) * 55
                 else:
-                    altura_grafico = 550  # Valor predeterminado si no hay columnas
+                    altura_grafico = 500 # Valor predeterminado si no hay columnas
 
                 # Crear el heatmap
                 fig = go.Figure(data=go.Heatmap(
                     z=z,
                     x=fechas,
-                    y=interpolated_df.columns[1:],  # Columnas de lotes
+                    y=lotes_labels,  # Columnas de lotes
                     colorscale=custom_colorscale,
                     hovertext=hovertext,  # Asignar la matriz de texto
                     hoverinfo="text"  # Mostrar la información de hovertext
@@ -1310,6 +1296,7 @@ def main_app(user_info):
                 fig.update_layout(
                     xaxis_title=translate("date2", lang),
                     yaxis_title=translate("field", lang),
+                    yaxis=dict(type='category'), 
                     autosize=True,
                     height=altura_grafico
                 )
@@ -1347,6 +1334,7 @@ def main_app(user_info):
                 fig.update_layout(
                     yaxis_title="NDVI",
                     xaxis_title=translate("field", lang),
+                    xaxis=dict(type='category'),
                     boxmode='group',
                     autosize=True,
                 )
@@ -1463,8 +1451,8 @@ def main_app(user_info):
 
 if __name__ == "__main__":
     redirect_uri=" http://localhost:8501"
-    user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'test', 'domainId': 1, 'areaId': 1, 'workspaceId': 882, 'seasonId': 172, 'farmId': 2016} # TEST / GeoAgro / GeoAgro / TEST_BONELLI / 2021-22 / Lacau SA - Antares
-    #user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'prod', 'domainId': 1, 'areaId': 1, 'workspaceId': 65, 'seasonId': 3486, 'farmId': 11143} 
+    #user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'test', 'domainId': 1, 'areaId': 1, 'workspaceId': 882, 'seasonId': 172, 'farmId': 2016} # TEST / GeoAgro / GeoAgro / TEST_BONELLI / 2021-22 / Lacau SA - Antares
+    user_info = {'email': "tvarela@geoagro.com", 'language': 'es', 'env': 'prod', 'domainId': 1, 'areaId': 1, 'workspaceId': 65, 'seasonId': 3486, 'farmId': 11143} 
     st.session_state['user_info'] = user_info
     main_app(user_info)
 
